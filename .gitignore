@@ -1,0 +1,45 @@
+# Python
+
+__pycache__/                    
+#ByteCode généré par Python (généré automatiquement, inutile de le partager)
+
+*.pyc
+#Fichiers compilés individuels
+
+.venv
+#Environnement virtuel (chaque dev crée le sien via poetry install)
+
+#Poetry
+poetry.lock
+# NON - NE PAS l'ignorer ! Il faut le versionner - à voir plus tard
+
+#Environnement
+.env
+# Variables sensibles (clés API, mots de passe) - JAMAIS dans Git
+
+#IDE
+.vscode/
+# Configuration spécifique à mon éditeur, pas celle des autres
+
+.idea/
+# Pareil pour PyCharm/IntelliJ
+
+# OS
+Thumbs.db
+#Fichier Windows généré automatiquement
+
+Desktop.ini
+# Idem
+
+# Node
+node_module/
+# Dépendances Node - chaque dev fait npm install
+
+dist/
+# Build React compilé
+
+# Claude
+.claude/
+
+# Cahier des charges
+*.docx

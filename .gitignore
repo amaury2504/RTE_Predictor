@@ -9,10 +9,6 @@ __pycache__/
 .venv
 #Environnement virtuel (chaque dev crée le sien via poetry install)
 
-#Poetry
-poetry.lock
-# NON - NE PAS l'ignorer ! Il faut le versionner - à voir plus tard
-
 #Environnement
 .env
 # Variables sensibles (clés API, mots de passe) - JAMAIS dans Git
@@ -32,7 +28,7 @@ Desktop.ini
 # Idem
 
 # Node
-node_module/
+node_modules/
 # Dépendances Node - chaque dev fait npm install
 
 dist/

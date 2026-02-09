@@ -1,5 +1,5 @@
-from electricity.ports.repository import ConsumptionRepository
-from electricity.domain.models import ConsumptionRecord
+from src.electricity.ports.repository import ConsumptionRepository
+from src.electricity.domain.models import ConsumptionRecord
 
 class StoreConsumption():
     """Classe qui permet de créer le use case enregistrant le record dans un repository"""

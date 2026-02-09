@@ -1,13 +1,17 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from src.electricity.adapters.persistence.in_memory_repository import InMemoryConsumptionRepository
+from src.electricity.adapters.persistence.sqlalchemy_repository import SQLAlchemyConsumptionRepository
+from src.electricity.adapters.persistence.sqlalchemy_models import Base,engine
 from src.electricity.domain.models import ConsumptionRecord
 from src.electricity.application.use_cases import StoreConsumption
 
+
 app=FastAPI()
 
+Base.metadata.create_all(engine)
+
 # WIRING : Créé une seule fois au démarrage
-repository=InMemoryConsumptionRepository()
+repository=SQLAlchemyConsumptionRepository()
 store_use_case=StoreConsumption(repository)
 
 @app.get("/")

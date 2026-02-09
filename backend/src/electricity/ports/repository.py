@@ -1,5 +1,5 @@
 from abc import ABC,abstractmethod
-from electricity.domain.models import ConsumptionRecord
+from src.electricity.domain.models import ConsumptionRecord
 
 
 class ConsumptionRepository(ABC):

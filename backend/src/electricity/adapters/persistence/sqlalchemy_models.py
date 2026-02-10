@@ -27,3 +27,18 @@ class ConsumptionRecordDB(Base):
     date=Column(String, nullable=False)
     hour=Column(Float,nullable=False)
     power=Column(Float,nullable=False)
+
+class WeatherRecordDB(Base):
+    # Création de la DB
+
+    __tablename__="Weather_records_by_region" # Nom de la DB
+
+    # Colonnes = Attributs de classe
+
+    id=Column(Integer,primary_key=True,autoincrement=True)
+    date=Column(String,nullable=False) # Colonne date : Format "JJ/MM/AAAA"
+    hour=Column(Float,nullable=False) # Colonne heure : Format 0-23
+    region=Column(String, nullable=False) # Colonne région
+    temperature=Column(Float,nullable=False) # Colonne température (en °C)
+    wind_speed=Column(Float,nullable=False) # Colonne wind_speed (en km/h)
+    relative_humidity=Column(Float,nullable=False) # Colonne relative_humidity (en %)

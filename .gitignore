@@ -39,3 +39,9 @@ dist/
 
 # Cahier des charges
 *.docx
+
+# Database :
+*.db
+
+# Fichier de consommation électrique 
+data/

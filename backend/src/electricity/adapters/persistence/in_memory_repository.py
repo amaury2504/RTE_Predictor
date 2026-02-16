@@ -1,4 +1,4 @@
-from electricity.application.use_cases import ConsumptionRepository
+from electricity.ports.repository import ConsumptionRepository
 from electricity.domain.models import ConsumptionRecord
 
 

@@ -5,7 +5,7 @@ from src.electricity.adapters.persistence.sqlalchemy_models import ConsumptionRe
 class SQLAlchemyConsumptionRepository(ConsumptionRepository):
     def save_record(self,record:ConsumptionRecord)->None:
         
-        # Conversion de ConsumptionRecord ver
+        # Conversion de ConsumptionRecord vers ConsumptionRecordDB
         consumption_record_db=ConsumptionRecordDB(date=record.date,hour=record.hour,power=record.power)
         # Ouverture de la session
         session = SessionLocal()

@@ -8,6 +8,8 @@ from src.prediction.adapters.ml.PyTorchPrediction import PredictWithPytorch
 from src.prediction.application.use_cases_prediction import PredictConsumptionUseCase
 from src.prediction.domain.models_prediction import PredictionResult, PredictionInput
 from src.prediction.adapters.ml.PyTorchPrediction import ConsumptionModel
+from src.auth.adapters.api.auth_routes import auth_router
+
 import torch
 import joblib
 
@@ -66,7 +68,4 @@ def predict_consumption(data:PredictionRequest):
     return(resultat)
 
 
-    
-
-
-
+app.include_router(router=auth_router)

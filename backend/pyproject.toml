@@ -17,7 +17,10 @@ dependencies = [
     "tqdm (>=4.67.3,<5.0.0)",
     "torch (>=2.10.0,<3.0.0) ; python_version == \"3.14\"",
     "scikit-learn (>=1.8.0,<2.0.0)",
-    "holidays (>=0.90,<0.91)"
+    "holidays (>=0.90,<0.91)",
+    "passlib[bcrypt] (>=1.7.4,<2.0.0)",
+    "python-jose[cryptography] (>=3.5.0,<4.0.0)",
+    "bcrypt (<4.1)"
 ]
 
 

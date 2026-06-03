@@ -26,6 +26,6 @@ class JWTTokenProvider(TokenProvider):
         payload={"sub":mail,"exp":exp_date}
         return(jwt.encode(claims=payload,key=self.secret_key,algorithm="HS256"))
     
-    def verify_token(self,token_used):
+    def verify_token(self,token_used)->str:
         payload=jwt.decode(token=token_used,key=self.secret_key,algorithms=["HS256"])
         return(payload["sub"])

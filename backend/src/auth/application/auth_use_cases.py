@@ -2,6 +2,8 @@ from src.auth.domain.models_auth import User
 from src.auth.ports.password_hasher import PasswordHasher
 from src.auth.ports.token_provider import TokenProvider
 from src.auth.ports.user_repository import UserRepository
+from src.auth.domain.exceptions import InvalidCredentialsError,UserAlreadyExistsError
+
 
 class RegisterUser():
     """Classe servant à créer le use_case d'enregistrement d'utilisateur.
@@ -21,6 +23,8 @@ class RegisterUser():
             hashed_password=self.password_hasher.hash_password(plain_password)
             user_to_register=User(mail=mail,hashed_password=hashed_password)
             self.repository.store_user(user_to_register)
+        else:
+            raise UserAlreadyExistsError(mail)
 
 
 
@@ -41,10 +45,12 @@ class LoginUser():
         self.token_provider=token_provider
 
     def execute(self,mail:str,plain_password:str)->str:
-        if not self.repository.get_by_mail(mail=mail):
-            raise ValueError
+        existing_user=self.repository.get_by_mail(mail=mail)
+        if not existing_user:
+            raise InvalidCredentialsError()
         else:
-            existing_user=self.repository.get_by_mail(mail=mail)
             if self.password_hasher.verify_password(plain_password,existing_user.hashed_password):
                 return self.token_provider.create_token(mail)
+            else:
+                raise InvalidCredentialsError()
 

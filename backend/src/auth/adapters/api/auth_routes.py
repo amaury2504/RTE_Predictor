@@ -7,6 +7,10 @@ from src.auth.adapters.security.jwt_token_provider import JWTTokenProvider
 import os
 from dotenv import load_dotenv
 from src.auth.adapters.persistence.sqlalchemy_models_auth import Base,engine
+from src.auth.adapters.api.auth_dependency import CheckAuthorization
+from src.auth.domain.exceptions import InvalidCredentialsError,UserAlreadyExistsError
+import logging
+logger = logging.getLogger(__name__)
 
 # Importation des variables d'environnements :
 load_dotenv()
@@ -33,24 +37,37 @@ class LoginRequest(BaseModel):
     mail:str
     plain_password:str
 
+class StatusResponse(BaseModel):
+    status:str
 
+class TokenResponse(BaseModel):
+    token:str
+
+checker=CheckAuthorization(token_provider)
 
 # Création du premier endpoint (register)
 
-@auth_router.post("/register")
-def register_user(request:LoginRequest)->None:
+@auth_router.post("/register",response_model=StatusResponse)
+def register_user(request:LoginRequest)->StatusResponse:
     """J'appelle mon use case Register_User"""
-    use_case=RegisterUser(repository,password_hasher)
-    use_case.execute(request.mail,request.plain_password)
-    return{"Status":"Ok"}
+    try:
+        use_case=RegisterUser(repository,password_hasher)
+        use_case.execute(request.mail,request.plain_password)
+        logger.info("Utilisateur enregistré : %s", request.mail)
+        return(StatusResponse(status="Ok"))
+        
+    except UserAlreadyExistsError:
+        logger.warning("Tentative d'inscription échouée : %s", request.mail)
+        raise HTTPException(status_code=401,detail="Cet email est déjà enregistré")
 
-
-@auth_router.post("/login")
-def login_user(request:LoginRequest)->dict:
+@auth_router.post("/login",response_model=TokenResponse)
+def login_user(request:LoginRequest)->TokenResponse:
     """Je vérifie si mon user peut se login et j'accède à sa demande si c'est le cas"""
     try:
         use_case=LoginUser(repository,password_hasher,token_provider)
         token=use_case.execute(request.mail,request.plain_password)
-        return({"token" : token})
-    except ValueError:
-        raise HTTPException(status_code=401)
+        logger.info("Login réussi : %s", request.mail)
+        return(TokenResponse(token=token))
+    except InvalidCredentialsError:
+        logger.warning("Tentative de login échouée : %s", request.mail)
+        raise HTTPException(status_code=401,detail="Identifiant ou mot de passe incorrect") 

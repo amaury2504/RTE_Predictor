@@ -3,7 +3,8 @@ from src.auth.ports.user_repository import UserRepository
 from src.auth.ports.password_hasher import PasswordHasher
 from src.auth.ports.token_provider import TokenProvider
 from src.auth.application.auth_use_cases import RegisterUser, LoginUser
-
+from src.auth.domain.exceptions import UserAlreadyExistsError
+import pytest
 
 class FakeUserRepository(UserRepository):
     """Sert à implémenter un User Repository bidon. C'est une liste de User"""
@@ -47,11 +48,15 @@ def test_register_user_really_add():
 
 
 def test_register_user_dont_add_if_mail_already_registered():
-    fake_repository=FakeUserRepository([])
-    use_case=RegisterUser(repository=fake_repository,password_hasher=FakePasswordHasher())
-    use_case.execute(mail="veroniquelachaux@gmail.com",plain_password="ezfhukzfu812476")
-    use_case.execute(mail="veroniquelachaux@gmail.com",plain_password="autrepassword")
-    assert len(fake_repository.repository)==1
+    
+
+    with pytest.raises(UserAlreadyExistsError):
+        fake_repository=FakeUserRepository([])
+        use_case=RegisterUser(repository=fake_repository,password_hasher=FakePasswordHasher())
+        mail_repeted="veroniquelachaux@gmail.com"
+        use_case.execute(mail=mail_repeted,plain_password="ezfhukzfu812476")
+        use_case.execute(mail=mail_repeted,plain_password="autrepassword")
+    
 
 def test_register_user_hash_password():
     fake_repository=FakeUserRepository([])

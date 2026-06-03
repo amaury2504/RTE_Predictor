@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import torch
 import torch.nn as nn
@@ -20,6 +21,11 @@ df["dayofweek"]=dt.dt.dayofweek
 # Ajout de features
 fr_holidays=holidays.France()
 df["is_holiday"]=dt.apply(lambda x:1 if x in fr_holidays else 0)
+
+# Encodage cyclique de l'heure (remplace le raw hour)
+df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
+df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)
+df = df.drop(columns=["hour"])
 
 # Pour chaque colonne de température, créer son carré
 for col in df.columns:
@@ -95,13 +101,15 @@ input_size = X_train.shape[1]
 model = ConsumptionModel(input_size)
 
 criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+# Relance le LR tous les 50 epochs, puis tous les 100, 200... → s'échappe des minima locaux
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=50, T_mult=2, eta_min=1e-6)
 
 print(model)
 
 # Entrainement avec early stopping
 best_val_loss = float('inf')
-patience = 20
+patience = 150
 patience_counter = 0
 
 for epoch in range(1000):
@@ -113,14 +121,17 @@ for epoch in range(1000):
         loss.backward()
         optimizer.step()
 
+    scheduler.step()
+    current_lr = optimizer.param_groups[0]['lr']
+
     # Validation
     model.eval()
     with torch.no_grad():
         Y_val_pred = model(X_val_tensor)
         val_loss = criterion(Y_val_pred, Y_val_tensor).item()
 
-    if epoch % 10 == 0:
-        print(f"Epoch {epoch} | Val loss: {val_loss:.6f}")
+    if epoch % 20 == 0:
+        print(f"Epoch {epoch} | Val loss: {val_loss:.6f} | LR: {current_lr:.2e}")
 
     # Early stopping
     if val_loss < best_val_loss:

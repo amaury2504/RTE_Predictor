@@ -14,27 +14,32 @@ class SQLAlchemyUserRepository(UserRepository):
         session=SessionLocal()
 
         #Ajout de l'objet dans la DB
+        try:
+            session.add(user_db)
+            
+            # Commit
+            session.commit()
+            
+            
+        finally:
 
-        session.add(user_db)
-
-        #Commit
-
-        session.commit()
-
-        #Fermeture de session :
-        session.close()
+            # Fermeture de session :
+            session.close()
 
     
     def get_by_mail(self,mail:str)->User|None:
 
         session=SessionLocal()
 
-        user_extracted=session.query(UserDB).filter(UserDB.mail==mail).first()
 
-        if not user_extracted:
+        try:
+            user_extracted=session.query(UserDB).filter(UserDB.mail==mail).first()
+            if not user_extracted:
+                return None
+            else:
+                user=User(user_extracted.mail,user_extracted.hashed_password)
+                return(user) 
+                
+                
+        finally:
             session.close()
-            return None
-        else:
-            user=User(user_extracted.mail,user_extracted.hashed_password)
-            session.close()
-            return(user)

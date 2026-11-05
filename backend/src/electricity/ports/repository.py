@@ -9,6 +9,13 @@ class ConsumptionRepository(ABC):
         """
         pass
 
+    def save_many(self,records:list[ConsumptionRecord])->None:
+        """Stocker plusieurs enregistrements. Par défaut, un par un ; les adaptateurs
+        peuvent surcharger pour faire une insertion groupée.
+        """
+        for record in records:
+            self.save_record(record)
+
     @abstractmethod
     def get_by_date(self,date:str)->list[ConsumptionRecord]:
         """Récupérer les enregistrements d'une date

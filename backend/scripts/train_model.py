@@ -1,3 +1,4 @@
+import time
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
@@ -92,9 +93,10 @@ Y_train_tensor = torch.FloatTensor(Y_train)
 X_val_tensor = torch.FloatTensor(X_val)
 Y_val_tensor = torch.FloatTensor(Y_val)
 
-# DataLoader
-train_dataset = TensorDataset(X_train_tensor, Y_train_tensor)
-train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True)
+# Mini-batchs construits directement depuis les tenseurs (plus rapide qu'un DataLoader
+# pour un petit réseau : pas de surcoût Python par lot)
+BATCH_SIZE = 512
+n_train = len(X_train_tensor)
 
 # Instanciation
 input_size = X_train.shape[1]
@@ -109,43 +111,59 @@ print(model)
 
 # Entrainement avec early stopping
 best_val_loss = float('inf')
-patience = 150
+best_state = None
+patience = 50
 patience_counter = 0
 
-for epoch in range(1000):
-    model.train()
-    for X_batch, Y_batch in train_loader:
-        Y_pred = model(X_batch)
-        loss = criterion(Y_pred, Y_batch)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+best_epoch = 0
+t_start = time.perf_counter()
 
-    scheduler.step()
-    current_lr = optimizer.param_groups[0]['lr']
+# Ctrl+C interrompt proprement l'entraînement : on garde le meilleur modèle trouvé
+# jusque-là et le script passe à l'évaluation et à la sauvegarde.
+try:
+    for epoch in range(1000):
+        model.train()
+        perm = torch.randperm(n_train)
+        for start in range(0, n_train, BATCH_SIZE):
+            idx = perm[start:start + BATCH_SIZE]
+            X_batch, Y_batch = X_train_tensor[idx], Y_train_tensor[idx]
+            Y_pred = model(X_batch)
+            loss = criterion(Y_pred, Y_batch)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-    # Validation
-    model.eval()
-    with torch.no_grad():
-        Y_val_pred = model(X_val_tensor)
-        val_loss = criterion(Y_val_pred, Y_val_tensor).item()
+        scheduler.step()
+        current_lr = optimizer.param_groups[0]['lr']
 
-    if epoch % 20 == 0:
-        print(f"Epoch {epoch} | Val loss: {val_loss:.6f} | LR: {current_lr:.2e}")
+        # Validation
+        model.eval()
+        with torch.no_grad():
+            Y_val_pred = model(X_val_tensor)
+            val_loss = criterion(Y_val_pred, Y_val_tensor).item()
 
-    # Early stopping
-    if val_loss < best_val_loss:
-        best_val_loss = val_loss
-        patience_counter = 0
-        torch.save(model.state_dict(), "data/best_model.pth")
-    else:
-        patience_counter += 1
-        if patience_counter >= patience:
-            print(f"Early stopping à epoch {epoch}")
-            break
+        if epoch % 20 == 0:
+            elapsed = time.perf_counter() - t_start
+            print(f"Epoch {epoch} | Val loss: {val_loss:.6f} | LR: {current_lr:.2e} "
+                  f"| meilleur: {best_val_loss:.6f} (epoch {best_epoch}) | {elapsed:.0f} s")
 
-# Recharger le meilleur modèle
-model.load_state_dict(torch.load("data/best_model.pth"))
+        # Early stopping
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_epoch = epoch
+            patience_counter = 0
+            best_state = {k: v.clone() for k, v in model.state_dict().items()}
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f"Early stopping à epoch {epoch}")
+                break
+except KeyboardInterrupt:
+    print(f"\nInterrompu à l'epoch {epoch} : on garde le meilleur modèle (epoch {best_epoch}).")
+
+# Recharger le meilleur modèle (gardé en mémoire) et l'écrire une seule fois sur disque
+model.load_state_dict(best_state)
+torch.save(best_state, "data/best_model.pth")
 
 # Évaluation sur le jeu de test
 model.eval()

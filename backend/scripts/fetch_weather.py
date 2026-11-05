@@ -185,35 +185,60 @@ class ImportJsonAndFormateDataframe():
 
 # --- Exécution ---
 
-Base.metadata.create_all(engine)
-session = SessionLocal()
-session.query(WeatherRecordDB).delete()
-session.commit()
+#
+# Usage (depuis backend/, venv actif) :
+#   python scripts/fetch_weather.py             # réutilise le cache disque s'il existe
+#   python scripts/fetch_weather.py --refresh   # force un nouveau téléchargement
+#
+# Cache : une réponse JSON brute par région dans data/weather_cache/. Si le script
+# échoue en cours de route, on le relance et seules les régions manquantes sont
+# retéléchargées.
 
-# 1. Fetch des 13 régions
+CACHE_DIR = "data/weather_cache"
+CHUNK_SIZE = 50_000  # lignes insérées par appel bulk
+DELAY_BETWEEN_REQUESTS = 10  # secondes, pour ménager l'API Open-Meteo
+refresh = "--refresh" in sys.argv
+
+os.makedirs(CACHE_DIR, exist_ok=True)
+Base.metadata.create_all(engine)
+
+# 1. Fetch des 13 régions (avec cache disque)
 fetcher = ImportJsonAndFormateDataframe(timeout=60)
 all_dataframes = []
 
 for region in tqdm(dictionnaire_regions, desc="Fetch météo"):
-    data = fetcher.request_data(region)
-    df = fetcher.format_dataframe(data, region)
-    all_dataframes.append(df)
-    time.sleep(10) # Attend 10 secondes avant la prochaine requête
+    cache_path = os.path.join(CACHE_DIR, f"{region.replace('/', '_')}.json")
+    if not refresh and os.path.exists(cache_path):
+        with open(cache_path, encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = fetcher.request_data(region)
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        # Pause uniquement après une vraie requête, et pas après la dernière région
+        if region != list(dictionnaire_regions)[-1]:
+            time.sleep(DELAY_BETWEEN_REQUESTS)
+    all_dataframes.append(fetcher.format_dataframe(data, region))
+
 df_total = pd.concat(all_dataframes, ignore_index=True)
-print(f"Total : {len(df_total)} lignes")
+total = len(df_total)
+print(f"Total : {total} lignes")
 
-
-for index, row in tqdm(df_total.iterrows(), total=len(df_total), desc="Import en base"):
-    record = WeatherRecordDB(
-        date=row["date"],
-        hour=row["hour"],
-        region=row["region"],
-        temperature=row["temperature"],
-        wind_speed=row["wind_speed"],
-        relative_humidity=row["relative_humidity"]
-    )
-    session.add(record)
-
-session.commit()
-session.close()
+# 2. Écriture en base : suppression + insertion dans UNE transaction.
+# La table n'est vidée qu'une fois toutes les données récupérées, et si l'insertion
+# échoue le rollback restaure l'ancien contenu.
+session = SessionLocal()
+try:
+    session.query(WeatherRecordDB).delete()
+    with tqdm(total=total, desc="Import en base", unit="ligne") as bar:
+        for i in range(0, total, CHUNK_SIZE):
+            chunk = df_total.iloc[i:i + CHUNK_SIZE]
+            session.bulk_insert_mappings(WeatherRecordDB, chunk.to_dict("records"))
+            bar.update(len(chunk))
+    session.commit()
+except Exception:
+    session.rollback()
+    raise
+finally:
+    session.close()
 print("Import terminé !")

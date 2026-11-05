@@ -20,6 +20,21 @@ class SQLAlchemyConsumptionRepository(ConsumptionRepository):
             session.close()
 
 
+    def save_many(self,records:list[ConsumptionRecord])->None:
+        # Insertion groupée : une seule session et un seul commit pour tous les records
+        session=SessionLocal()
+        try:
+            session.bulk_insert_mappings(
+                ConsumptionRecordDB,
+                [{"date":r.date,"hour":r.hour,"power":r.power} for r in records],
+            )
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     def get_by_date(self, date_query:str)->list[ConsumptionRecord]:
         # Ouverture de la session
         session=SessionLocal()

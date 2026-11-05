@@ -21,9 +21,10 @@ import json
 import os
 from datetime import datetime, timezone
 
-from src.prediction.adapters.datasets.csv_dataset import load_full_dataset
+from src.prediction.adapters.datasets.csv_dataset import load_full_dataset, load_reference_forecasts
 from src.prediction.adapters.ml.lightgbm_regressor import LightGBMRegressor
 from src.prediction.adapters.ml.mlp_regressor import MLPRegressor
+from src.prediction.application.baselines import run_baselines
 from src.prediction.application.benchmark import SUMMARY_KPIS, run_walk_forward, summarize, summarize_by_fold
 
 DEFAULT_TEST_YEARS = [2022, 2023, 2024]
@@ -96,6 +97,8 @@ def main():
                         help="ne pas réentraîner sur entraînement + validation après le réglage")
     parser.add_argument("--half-life", type=float, default=3.0,
                         help="demi-vie (années) de la pondération des variantes _recent")
+    parser.add_argument("--no-baselines", action="store_true",
+                        help="ne pas ajouter les références (prévisions naïves et prévisions RTE)")
     parser.add_argument("--data", default="data/dataset_ml.csv")
     parser.add_argument("--out", default="benchmark")
     args = parser.parse_args()
@@ -115,6 +118,8 @@ def main():
         {n: registry[n] for n in names}, full, args.test_years, seeds,
         on_progress=lambda message: print(f"[run ] {message}", flush=True),
     )
+    if not args.no_baselines:
+        results += run_baselines(full, load_reference_forecasts(args.data), args.test_years)
     summary = summarize(results)
     by_fold = summarize_by_fold(results)
 

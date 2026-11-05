@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from src.prediction.domain.dataset import FullDataset
@@ -25,3 +26,37 @@ def load_full_dataset(path: str = "data/dataset_ml.csv") -> FullDataset:
     timestamps = local.dt.strftime("%Y-%m-%dT%H:00").tolist()
 
     return FullDataset(X=X, y=y, timestamps=timestamps, years=day.dt.year.to_numpy())
+
+
+RTE_PATH = "data/eco2mix-national-cons-def.csv"
+
+
+def load_reference_forecasts(dataset_path: str = "data/dataset_ml.csv", rte_path: str = RTE_PATH) -> dict[str, np.ndarray]:
+    """Prévisions de référence alignées ligne à ligne sur `load_full_dataset` (GW ; NaN si indisponible).
+
+    Ces références utilisent la consommation passée (ou les prévisions d'RTE) : elles ne respectent
+    pas le contrat des modèles météo + calendrier et sont classées à part.
+
+    - ref_naive_j1   : consommation observée 24 h plus tôt
+    - ref_naive_s1   : consommation observée 168 h plus tôt (même heure, semaine précédente)
+    - ref_rte_j1     : prévision J-1 publiée par RTE (moyenne horaire des pas de 15 min)
+    - ref_rte_j      : prévision J (jour même) publiée par RTE ; les valeurs 0 sont des trous
+    """
+    raw = pd.read_csv(dataset_path, encoding="utf-8", usecols=["date", "hour", "consommation"])
+    utc = pd.DatetimeIndex(pd.to_datetime(raw["date"], format="%d/%m/%Y") + pd.to_timedelta(raw["hour"], unit="h"))
+    actual = pd.Series(raw["consommation"].to_numpy(dtype=float), index=utc)
+
+    refs = {
+        "ref_naive_j1": actual.reindex(utc - pd.Timedelta(hours=24)).to_numpy(),
+        "ref_naive_s1": actual.reindex(utc - pd.Timedelta(hours=168)).to_numpy(),
+    }
+
+    rte = pd.read_csv(rte_path, sep=";", encoding="utf-8-sig", usecols=[4, 6, 7])
+    rte.columns = ["datetime", "j1", "j"]
+    rte["t"] = pd.to_datetime(rte["datetime"], utc=True).dt.tz_localize(None)
+    rte = rte.drop_duplicates("t").set_index("t").drop(columns="datetime")
+    rte["j"] = rte["j"].replace(0, np.nan)
+    hourly = rte.groupby(rte.index.floor("h")).mean() / 1000.0  # MW -> GW
+    refs["ref_rte_j1"] = hourly["j1"].reindex(utc).to_numpy()
+    refs["ref_rte_j"] = hourly["j"].reindex(utc).to_numpy()
+    return refs

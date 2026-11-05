@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute"
 import LoginPage from "./pages/LoginPage"
 import PredictionPage from "./pages/PredictionPage"
 import ModelPerformancePage from "./pages/ModelPerformancePage"
+import BenchmarkPage from "./pages/BenchmarkPage"
 
 export default function App() {
     return (
@@ -24,6 +25,14 @@ export default function App() {
                         element={
                             <ProtectedRoute>
                                 <ModelPerformancePage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/benchmark"
+                        element={
+                            <ProtectedRoute>
+                                <BenchmarkPage />
                             </ProtectedRoute>
                         }
                     />

@@ -7,6 +7,9 @@ import {
 import { fetchWeekWeather, batchPredict, fetchRTEWeek, fetchKpis } from "../services/api"
 import { useAuth } from "../context/AuthContext"
 import Navbar from "../components/Navbar"
+import KpiCard from "../components/KpiCard"
+import type { KpiItem } from "../components/KpiCard"
+import { num, pct, signed } from "../lib/format"
 import { REGIONS } from "../types/api"
 import type { RegionWeather, KpiReport, KpiPoint, SegmentKpi } from "../types/api"
 
@@ -55,41 +58,7 @@ function generateHours(): HourEntry[] {
     })
 }
 
-// --- Formatage ---------------------------------------------------------------
-
-const nf = (digits: number) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: digits, maximumFractionDigits: digits })
-
-const num = (v: number | null, digits = 2, unit = "") => (v == null ? "—" : `${nf(digits).format(v)}${unit}`)
-const pct = (v: number | null, digits = 1) => num(v, digits, " %")
-const signed = (v: number | null, digits = 2, unit = "") =>
-    v == null ? "—" : `${v > 0 ? "+" : ""}${nf(digits).format(v)}${unit}`
-
 // --- Composants d'affichage --------------------------------------------------
-
-type Tone = "default" | "good" | "warn"
-
-interface KpiItem {
-    label: string
-    value: string
-    hint: string
-    tone?: Tone
-}
-
-const TONE_CLASS: Record<Tone, string> = {
-    default: "text-ink",
-    good: "text-emerald-400",
-    warn: "text-amber-400",
-}
-
-function KpiCard({ label, value, hint, tone = "default" }: KpiItem) {
-    return (
-        <div className="rounded-xl border border-line bg-surface p-5 shadow-card">
-            <p className="text-xs font-medium uppercase tracking-widest text-muted">{label}</p>
-            <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${TONE_CLASS[tone]}`}>{value}</p>
-            <p className="mt-1.5 text-xs leading-snug text-faint">{hint}</p>
-        </div>
-    )
-}
 
 function KpiGroup({ title, items }: { title: string; items: KpiItem[] }) {
     return (

@@ -1,4 +1,4 @@
-import type { PredictionRequest, PredictionResponse, RegionWeather, KpiPoint, KpiReport } from "../types/api"
+import type { PredictionRequest, PredictionResponse, RegionWeather, KpiPoint, KpiReport, BenchmarkResults } from "../types/api"
 import { REGIONS, REGION_COORDS } from "../types/api"
 
 const BASE_URL = "http://localhost:8000"
@@ -180,4 +180,15 @@ export const fetchRTEWeek =async (token: string): Promise<Record<string, number>
     return Object.fromEntries(
         (data.data as Array<{ datetime: string; consumption: number }>).map(r => [r.datetime, r.consumption])
     )
+}
+
+export const fetchBenchmark = async (token: string): Promise<BenchmarkResults> => {
+    const res = await fetch(`${BASE_URL}/prediction/benchmark`, {
+        headers: { "Authorization": `Bearer ${token}` },
+    })
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(typeof err.detail === "string" ? err.detail : `Résultats indisponibles (HTTP ${res.status})`)
+    }
+    return await res.json()
 }

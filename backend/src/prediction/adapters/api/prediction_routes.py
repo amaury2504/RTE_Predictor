@@ -6,6 +6,7 @@ from src.auth.adapters.api.auth_routes import checker
 from src.prediction.domain.models_prediction import PredictionInput, PredictionResult
 from src.prediction.application.use_cases_prediction import PredictConsumptionUseCase, ComputeKpisUseCase
 from src.prediction.adapters.ml.PyTorchPrediction import PredictWithPytorch
+from src.prediction.adapters.datasets.benchmark_results import load_benchmark_results
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 import torch
@@ -243,3 +244,14 @@ async def get_rte_week():
     hourly.sort(key=lambda x: x.datetime)
     logger.info("RTE semaine : %d points horaires retournés", len(hourly))
     return RTEWeekResponse(data=hourly)
+
+
+@prediction_router.get("/benchmark", dependencies=[Depends(checker.authorized_request)])
+def get_benchmark_results():
+    """Résultats du dernier benchmark (modèles, références, années de test), tels qu'écrits par run_benchmark.py."""
+    try:
+        return load_benchmark_results()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Aucun résultat de benchmark : lancer scripts/run_benchmark.py")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))

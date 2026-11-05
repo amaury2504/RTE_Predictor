@@ -254,6 +254,14 @@ export default function PredictionPage() {
                 </button>
 
                 <button
+                    onClick={() => navigate("/benchmark")}
+                    disabled={isAnyLoading}
+                    className="w-full rounded-lg border border-line bg-surface py-3 text-sm font-semibold text-ink transition-colors hover:border-neon/50 hover:text-neon-soft disabled:opacity-50"
+                >
+                    Comparaison des modèles
+                </button>
+
+                <button
                     onClick={handlePredict}
                     disabled={isAnyLoading}
                     className="w-full rounded-lg border border-neon/50 bg-transparent py-3 text-sm font-semibold text-neon-soft transition-colors hover:bg-neon/10 disabled:opacity-40"

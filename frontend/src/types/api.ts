@@ -99,3 +99,33 @@ export const REGIONS: string[]=["Île-de-France",
                     "Occitanie",
                     "Pays de la Loire",
                     "Provence-Alpes-Côte d'Azur"]
+
+// --- Benchmark des modèles ---------------------------------------------------
+
+export type BenchmarkKpiKey = "mae" | "mae_debiased" | "rmse" | "mape" | "wape" | "bias" | "p95_ae" | "r2" | "mase"
+
+export type BenchmarkRow = {
+    model: string
+    runs: number
+    val_mae: number
+    fit_seconds: number
+    predict_seconds: number
+    /** Présent dans le classement global : nombre d'années de test */
+    folds?: number
+    /** Présent dans le détail par année */
+    test_year?: number
+} & Record<BenchmarkKpiKey, number | null> & Record<`${BenchmarkKpiKey}_std`, number | null>
+
+export interface BenchmarkResults {
+    generated_at: string
+    protocol: {
+        scheme: string
+        test_years: number[]
+        seeds: number[]
+        refit_on_train_and_val: boolean
+        recency_half_life_years: number
+        bias_correction?: { window_days: number; delay_days: number; min_days: number }
+    }
+    summary: BenchmarkRow[]
+    by_fold: BenchmarkRow[]
+}

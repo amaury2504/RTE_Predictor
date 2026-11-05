@@ -55,3 +55,13 @@ def test_ridge_accepts_weights_and_unseen_column_order():
 def test_ridge_predict_before_fit_raises():
     with pytest.raises(RuntimeError):
         RidgeRegressor().predict(pd.DataFrame({"month": [1]}))
+
+
+def test_ridge_handles_missing_values_with_training_mean():
+    X, y = make_xy()
+    X = X.assign(conso_lag_48h=y + np.random.default_rng(2).normal(0, 0.1, len(y)))
+    X.loc[::17, "conso_lag_48h"] = np.nan
+    model = RidgeRegressor(name="ridge_niveau")
+    model.fit(X[:200], y[:200], X[200:250], y[200:250])
+    pred = model.predict(X[250:])
+    assert model.name == "ridge_niveau" and np.isfinite(pred).all()

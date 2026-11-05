@@ -28,15 +28,17 @@ class RidgeRegressor(RegressorPort):
         alphas: tuple[float, ...] = (0.01, 0.1, 1, 10, 100, 1000),
         refit_on_val: bool = True,
         recency_half_life_years: float | None = None,
+        name: str | None = None,
     ):
         self.alphas = alphas
         self.refit_on_val = refit_on_val
         self.recency_half_life_years = recency_half_life_years
-        self.name = "ridge_recent" if recency_half_life_years else "ridge"
+        self.name = name or ("ridge_recent" if recency_half_life_years else "ridge")
 
         self.model: Ridge | None = None
         self.scaler: StandardScaler | None = None
         self.columns_: list[str] | None = None
+        self.fill_: np.ndarray | None = None
         self.best_alpha_: float | None = None
         self.val_predictions_: np.ndarray | None = None
 
@@ -50,7 +52,10 @@ class RidgeRegressor(RegressorPort):
         design = pd.concat(parts, axis=1)
         if self.columns_ is None:
             self.columns_ = list(design.columns)
-        return design[self.columns_].to_numpy(dtype=float)
+        A = design[self.columns_].to_numpy(dtype=float)
+        if self.fill_ is None:
+            self.fill_ = np.nanmean(A, axis=0)   # valeurs manquantes (début de série, heures absentes) : moyenne d'entraînement
+        return np.where(np.isnan(A), self.fill_, A)
 
     def _fit_once(self, A: np.ndarray, y: np.ndarray, w: np.ndarray | None, alpha: float) -> tuple[StandardScaler, Ridge]:
         scaler = StandardScaler().fit(A)
@@ -59,6 +64,7 @@ class RidgeRegressor(RegressorPort):
 
     def fit(self, X_train, y_train, X_val, y_val, w_train=None, w_val=None) -> None:
         self.columns_ = None
+        self.fill_ = None
         At, Av = self._design(X_train), self._design(X_val)
         yt, yv = np.asarray(y_train, dtype=float), np.asarray(y_val, dtype=float)
 

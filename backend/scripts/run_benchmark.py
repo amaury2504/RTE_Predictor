@@ -29,6 +29,8 @@ from src.prediction.application.baselines import run_baselines
 from src.prediction.application.benchmark import SUMMARY_KPIS, run_walk_forward, summarize, summarize_by_fold
 
 DEFAULT_TEST_YEARS = [2022, 2023, 2024]
+# Piste B : ces modèles reçoivent en plus des variables de niveau récent de la consommation (domain/level.py)
+TRACK_B = ("ridge_niveau", "lightgbm_niveau")
 
 
 def build_registry(max_epochs: int, patience: int, refit: bool, half_life: float) -> dict:
@@ -42,6 +44,8 @@ def build_registry(max_epochs: int, patience: int, refit: bool, half_life: float
             seed=seed, max_epochs=max_epochs, patience=patience, refit_on_val=refit, recency_half_life_years=half_life),
         "ridge": lambda seed: RidgeRegressor(refit_on_val=refit),
         "ridge_recent": lambda seed: RidgeRegressor(refit_on_val=refit, recency_half_life_years=half_life),
+        "ridge_niveau": lambda seed: RidgeRegressor(refit_on_val=refit, name="ridge_niveau"),
+        "lightgbm_niveau": lambda seed: LightGBMRegressor(seed=seed, refit_on_val=refit, name="lightgbm_niveau"),
         "lightgbm": lambda seed: LightGBMRegressor(seed=seed, refit_on_val=refit),
         "lightgbm_recent": lambda seed: LightGBMRegressor(
             seed=seed, refit_on_val=refit, recency_half_life_years=half_life),
@@ -115,15 +119,22 @@ def main():
         sys.exit(f"Modèle inconnu : {unknown}. Disponibles : {list(registry)}")
 
     print("Chargement des données...", flush=True)
-    full = load_full_dataset(args.data)
-    print(f"{len(full.y)} lignes | {full.X.shape[1]} variables | années de test : {args.test_years}", flush=True)
-
     seeds = list(range(args.seeds))
-    results = run_walk_forward(
-        {n: registry[n] for n in names}, full, args.test_years, seeds,
-        on_progress=lambda message: print(f"[run ] {message}", flush=True),
-        bias_window_days=args.bias_window or None,
-    )
+    results = []
+    # Piste A (météo + calendrier) puis piste B (avec niveau récent) : deux jeux de variables différents
+    for track, label in (("A", "météo + calendrier"), ("B", "avec niveau récent")):
+        track_names = [n for n in names if (n in TRACK_B) == (track == "B")]
+        if not track_names:
+            continue
+        full = load_full_dataset(args.data, level_features=(track == "B"))
+        print(f"Piste {track} ({label}) : {len(full.y)} lignes | {full.X.shape[1]} variables | "
+              f"années de test : {args.test_years}", flush=True)
+        results += run_walk_forward(
+            {n: registry[n] for n in track_names}, full, args.test_years, seeds,
+            on_progress=lambda message, track=track: print(f"[run {track}] {message}", flush=True),
+            # La correction du biais n'a pas de sens pour la piste B, qui voit déjà le niveau récent
+            bias_window_days=(args.bias_window or None) if track == "A" else None,
+        )
     if not args.no_baselines:
         results += run_baselines(full, load_reference_forecasts(args.data), args.test_years)
     summary = summarize(results)
@@ -133,7 +144,7 @@ def main():
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "protocol": {
-            "track": "A (météo et calendrier)",
+            "tracks": {"A": "météo et calendrier", "B": "météo, calendrier et niveau récent de la consommation"},
             "scheme": "glissant : test T, validation T-1, entraînement <= T-2",
             "test_years": args.test_years,
             "seeds": seeds,

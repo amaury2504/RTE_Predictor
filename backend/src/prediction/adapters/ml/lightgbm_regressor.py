@@ -36,6 +36,7 @@ class LightGBMRegressor(RegressorPort):
         early_stopping_rounds: int = 100,
         refit_on_val: bool = True,
         recency_half_life_years: float | None = None,
+        name: str | None = None,
     ):
         self.seed = seed
         self.n_estimators = n_estimators
@@ -47,7 +48,7 @@ class LightGBMRegressor(RegressorPort):
         self.early_stopping_rounds = early_stopping_rounds
         self.refit_on_val = refit_on_val
         self.recency_half_life_years = recency_half_life_years
-        self.name = "lightgbm_recent" if recency_half_life_years else "lightgbm"
+        self.name = name or ("lightgbm_recent" if recency_half_life_years else "lightgbm")
 
         self.model: lgb.LGBMRegressor | None = None
         self.feature_names_: list[str] | None = None

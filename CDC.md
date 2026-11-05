@@ -56,7 +56,8 @@ ses résultats figurent dans le tableau.
 - [x] Évaluation glissante sur 3 années de test (`split_for_test_year`, `run_walk_forward`), résultats globaux et par année.
 - [x] Réentraînement sur entraînement + validation (LightGBM, MLP) et variantes `_recent` (poids selon l'âge).
 - [ ] Lancement complet (5 graines) des modèles et enregistrement des résultats dans `benchmark/`.
-- [ ] Références (prévision naïve J-1 et semaine précédente, prévisions officielles RTE si exploitables), Ridge.
+- [x] Références (`ref_naive_j1`, `ref_naive_s1`, `ref_rte_j1`, `ref_rte_j`), classées à part car elles utilisent la consommation passée ou les prévisions d'RTE.
+- [x] Ridge (`adapters/ml/ridge_regressor.py`) : mois et jour en 0/1, `alpha` choisi sur la validation, variantes `ridge` et `ridge_recent`.
 
 ## 5. Architecture (hexagonale, conservée)
 

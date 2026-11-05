@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from src.prediction.adapters.datasets.csv_dataset import load_full_dataset, load_reference_forecasts
 from src.prediction.adapters.ml.lightgbm_regressor import LightGBMRegressor
 from src.prediction.adapters.ml.mlp_regressor import MLPRegressor
+from src.prediction.adapters.ml.ridge_regressor import RidgeRegressor
 from src.prediction.application.baselines import run_baselines
 from src.prediction.application.benchmark import SUMMARY_KPIS, run_walk_forward, summarize, summarize_by_fold
 
@@ -39,6 +40,8 @@ def build_registry(max_epochs: int, patience: int, refit: bool, half_life: float
         "mlp": lambda seed: MLPRegressor(seed=seed, max_epochs=max_epochs, patience=patience, refit_on_val=refit),
         "mlp_recent": lambda seed: MLPRegressor(
             seed=seed, max_epochs=max_epochs, patience=patience, refit_on_val=refit, recency_half_life_years=half_life),
+        "ridge": lambda seed: RidgeRegressor(refit_on_val=refit),
+        "ridge_recent": lambda seed: RidgeRegressor(refit_on_val=refit, recency_half_life_years=half_life),
         "lightgbm": lambda seed: LightGBMRegressor(seed=seed, refit_on_val=refit),
         "lightgbm_recent": lambda seed: LightGBMRegressor(
             seed=seed, refit_on_val=refit, recency_half_life_years=half_life),

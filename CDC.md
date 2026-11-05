@@ -58,6 +58,8 @@ ses résultats figurent dans le tableau.
 - [ ] Lancement complet (5 graines) des modèles et enregistrement des résultats dans `benchmark/`.
 - [x] Références (`ref_naive_j1`, `ref_naive_s1`, `ref_rte_j1`, `ref_rte_j`), classées à part car elles utilisent la consommation passée ou les prévisions d'RTE.
 - [x] Ridge (`adapters/ml/ridge_regressor.py`) : mois et jour en 0/1, `alpha` choisi sur la validation, variantes `ridge` et `ridge_recent`.
+- [x] Diagnostic du biais de niveau et correction du biais récent (`domain/bias_correction.py`, lignes `*_corr`), MAE centrée (`mae_debiased`). Voir `DECISIONS.md`.
+- [x] Piste B, premiers modèles : `ridge_niveau` et `lightgbm_niveau` avec variables de niveau récent (`domain/level.py`, prévision faite avec les données connues jusqu'à t - 48 h) et référence `ref_naive_j2`.
 
 ## 5. Architecture (hexagonale, conservée)
 
@@ -113,10 +115,12 @@ Une seule commande relance les quatre modèles et produit un classement identiqu
   Résultat obtenu : réentraînement sur entraînement + validation et pondération des années récentes
   (demi-vie 3 ans) font passer LightGBM de MAE 3,14 à 2,65 GW et de biais +2,87 à +2,24 GW (moyenne des
   3 années de test, 1 graine). Le biais reste présent.
-- Demi-vie de la pondération (3 ans, choisie a priori) : à choisir sur la validation, jamais sur le test.
-- Les écarts mesurés avec une seule graine ne sont pas encore accompagnés d'un écart-type entre graines.
-- Colonnes `Prévision J-1 (MW)` et `Prévision J (MW)` du fichier RTE : vérifier leur complétude et en faire
-  une référence.
+  Mise à jour : le biais est un changement de régime après 2022 (diagnostic et cause non établie dans
+  `DECISIONS.md`). Correction du biais récent et variables de niveau récent (piste B) le traitent ; combiner
+  les deux reste à tester.
+- Demi-vie de la pondération (3 ans) : conservée telle quelle, sans réglage (décision : ne pas optimiser un
+  symptôme, voir `DECISIONS.md`).
+- Le MLP n'a pas encore de résultat 5 graines sur le protocole complet.
 - Décider si les variantes de réseaux de neurones comptent comme des modèles distincts dans le classement.
 
 ## 10. Déploiement d'une démo en ligne (à planifier)

@@ -1,5 +1,6 @@
 from src.prediction.domain.models_prediction import PredictionInput, PredictionResult, ModelMetrics
 from src.prediction.ports.predict import PredictionModelPort,EvaluateModelPort
+from src.prediction.domain.kpi import compute_kpis, KpiReport
 
 class PredictConsumptionUseCase():
     """Ce use case sert à orchestrer les étapes pour passer d'un Prediction Input à un PredictionResult
@@ -40,3 +41,24 @@ class EvaluateModelPerformanceUseCase():
     def evaluate_model(self)->ModelMetrics:
         metriques=self.methode.evaluate(self.test_sample,self.target_output)
         return(metriques)
+
+
+class ComputeKpisUseCase():
+    """Calcule le rapport complet de KPI à partir de séries (prédit, réel) horodatées.
+
+    Args:
+        timestamps : horodatages locaux, un par point (ex. "2026-05-27T14:00")
+        predicted : puissances prédites (GW)
+        actual : puissances réelles (GW)
+
+    Returns:
+        KpiReport
+    """
+
+    def __init__(self,timestamps:list[str],predicted:list[float],actual:list[float]):
+        self.timestamps=timestamps
+        self.predicted=predicted
+        self.actual=actual
+
+    def execute(self)->KpiReport:
+        return compute_kpis(self.timestamps,self.predicted,self.actual)

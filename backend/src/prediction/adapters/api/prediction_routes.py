@@ -1,9 +1,10 @@
+from dataclasses import asdict
 from fastapi import Depends, APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from src.prediction.adapters.ml.PyTorchPrediction import ConsumptionModel
 from src.auth.adapters.api.auth_routes import checker
 from src.prediction.domain.models_prediction import PredictionInput, PredictionResult
-from src.prediction.application.use_cases_prediction import PredictConsumptionUseCase
+from src.prediction.application.use_cases_prediction import PredictConsumptionUseCase, ComputeKpisUseCase
 from src.prediction.adapters.ml.PyTorchPrediction import PredictWithPytorch
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
@@ -39,6 +40,52 @@ class BatchPredictionRequest(BaseModel):
 
 class BatchPredictionResponse(BaseModel):
     items: list[PredictionResponse]
+
+
+class KpiPointRequest(BaseModel):
+    datetime: str           # horodatage local, ex. "2026-05-27T14:00"
+    predicted: float        # GW
+    actual: float           # GW
+
+
+class KpiRequest(BaseModel):
+    points: list[KpiPointRequest] = Field(min_length=1, max_length=5000)
+
+
+class SegmentKpiResponse(BaseModel):
+    key: str | int
+    n: int
+    mae: float
+    mape: float | None
+    bias: float
+
+
+class KpiResponse(BaseModel):
+    n: int
+    mean_actual: float
+    mean_predicted: float
+    mae: float
+    rmse: float
+    mape: float | None
+    wape: float | None
+    smape: float | None
+    nrmse: float | None
+    bias: float
+    median_ae: float
+    p95_ae: float
+    max_ae: float
+    r2: float | None
+    mase: float | None
+    within_5_pct: float | None
+    within_10_pct: float | None
+    peak_days: int
+    peak_mae: float | None
+    peak_bias: float | None
+    peak_hour_mae: float | None
+    by_hour: list[SegmentKpiResponse]
+    by_day: list[SegmentKpiResponse]
+    weekday: SegmentKpiResponse | None
+    weekend: SegmentKpiResponse | None
 
 
 class RTEDataPoint(BaseModel):
@@ -125,7 +172,23 @@ def batch_predict(data: BatchPredictionRequest):
     return BatchPredictionResponse(items=results)
 
 
-@prediction_router.get("/rte-week", dependencies=[Depends(checker.authorized_request)], response_model=RTEWeekResponse)
+@prediction_router.post("/kpis", dependencies=[Depends(checker.authorized_request)], response_model=KpiResponse)
+def compute_model_kpis(data: KpiRequest):
+    """Calcule les KPI de performance à partir de couples (prédit, réel) horodatés, en GW."""
+    use_case = ComputeKpisUseCase(
+        timestamps=[p.datetime for p in data.points],
+        predicted=[p.predicted for p in data.points],
+        actual=[p.actual for p in data.points],
+    )
+    try:
+        report = use_case.execute()
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    logger.info("KPI calculés sur %d points", report.n)
+    return KpiResponse.model_validate(asdict(report))
+
+
+@prediction_router.get("/rte-week",dependencies=[Depends(checker.authorized_request)], response_model=RTEWeekResponse)
 async def get_rte_week():
     now = datetime.now(timezone.utc)
     end_dt = (now - timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)

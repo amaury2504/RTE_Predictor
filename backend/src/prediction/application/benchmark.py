@@ -90,10 +90,13 @@ def run_benchmark(
     on_progress: Callable[[str], None] = lambda message: None,
     test_year: int | None = None,
     bias_window_days: int | None = None,
+    cache=None,
 ) -> list[RunResult]:
     """Exécute chaque modèle sur un découpage : une fois par graine s'il est stochastique, une fois sinon.
 
     Avec `bias_window_days`, chaque modèle produit une ligne de plus, « <nom>_corr », avec le biais récent corrigé.
+    Avec `cache` (RunCache), une exécution déjà faite est relue au lieu d'être refaite, et chaque nouvelle
+    exécution est sauvegardée dès qu'elle est terminée.
     """
     results: list[RunResult] = []
     for name, factory in factories.items():
@@ -101,9 +104,15 @@ def run_benchmark(
             regressor = factory(seed)
             if i > 0 and not regressor.stochastic:
                 break
-            on_progress(f"{name} (graine {seed})")
-            result = evaluate_regressor(
-                regressor, data, seed if regressor.stochastic else None, test_year, bias_window_days)
+            run_seed = seed if regressor.stochastic else None
+            result = cache.get(regressor.name, run_seed, test_year) if cache else None
+            if result is not None:
+                on_progress(f"{name} (graine {seed}) : déjà fait, relu")
+            else:
+                on_progress(f"{name} (graine {seed})")
+                result = evaluate_regressor(regressor, data, run_seed, test_year, bias_window_days)
+                if cache:
+                    cache.put(result, run_seed)
             results.append(result)
             if result.test_corrected is not None:
                 results.append(replace(
@@ -118,6 +127,7 @@ def run_walk_forward(
     seeds: list[int],
     on_progress: Callable[[str], None] = lambda message: None,
     bias_window_days: int | None = None,
+    cache=None,
 ) -> list[RunResult]:
     """Évaluation glissante : refait tout le protocole pour chaque année de test."""
     results: list[RunResult] = []
@@ -128,6 +138,7 @@ def run_walk_forward(
             on_progress=lambda message, year=year: on_progress(f"test {year} · {message}"),
             test_year=year,
             bias_window_days=bias_window_days,
+            cache=cache,
         )
     return results
 

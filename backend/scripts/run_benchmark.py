@@ -19,16 +19,23 @@ sys.path.insert(0, ".")
 import argparse
 import json
 import os
+import time
 from datetime import datetime, timezone
 
-from src.prediction.adapters.datasets.csv_dataset import load_full_dataset, load_reference_forecasts
+from src.prediction.adapters.datasets.csv_dataset import (
+    load_foundation_forecasts, load_full_dataset, load_reference_forecasts, load_smoothing_candidates,
+)
 from src.prediction.adapters.ml.lightgbm_regressor import LightGBMRegressor
 from src.prediction.adapters.ml.mlp_regressor import MLPRegressor
 from src.prediction.adapters.ml.ridge_regressor import RidgeRegressor
-from src.prediction.application.baselines import run_baselines
+from src.prediction.adapters.ml.timestral_loader import INSTALL_HINT, load_timestral, timestral_available
+from src.prediction.application.baselines import run_baselines, run_tuned_reference
 from src.prediction.application.benchmark import SUMMARY_KPIS, run_walk_forward, summarize, summarize_by_fold
+from src.prediction.application.run_cache import RunCache, config_key, source_fingerprint
 
 DEFAULT_TEST_YEARS = [2022, 2023, 2024]
+# Modèles longs à entraîner : lancés en premier et avec --heavy-seeds graines
+HEAVY_MODELS = ("mlp", "mlp_recent")
 # Piste B : ces modèles reçoivent en plus des variables de niveau récent de la consommation (domain/level.py)
 TRACK_B = ("ridge_niveau", "lightgbm_niveau")
 
@@ -50,6 +57,11 @@ def build_registry(max_epochs: int, patience: int, refit: bool, half_life: float
         "lightgbm_recent": lambda seed: LightGBMRegressor(
             seed=seed, refit_on_val=refit, recency_half_life_years=half_life),
     }
+
+
+def format_duration(seconds: float) -> str:
+    minutes = int(seconds // 60)
+    return f"{minutes // 60} h {minutes % 60:02d}" if minutes >= 60 else f"{minutes} min"
 
 
 def fmt(value, digits=2):
@@ -108,6 +120,14 @@ def main():
                         help="fenêtre (jours) de la correction du biais récent ; 0 = pas de variante _corr")
     parser.add_argument("--no-baselines", action="store_true",
                         help="ne pas ajouter les références (prévisions naïves et prévisions RTE)")
+    parser.add_argument("--heavy-seeds", type=int, default=None,
+                        help="nombre de graines pour les modèles longs (MLP) ; défaut : même valeur que --seeds")
+    parser.add_argument("--no-timestral", action="store_true", help="ne pas évaluer Timestral (modèle de fondation)")
+    parser.add_argument("--timestral-model", default="mistralai/Timestral-209M",
+                        help="identifiant Hugging Face du modèle Timestral")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="ne pas sauvegarder ni relire les exécutions terminées")
+    parser.add_argument("--cache-dir", default="benchmark_cache")
     parser.add_argument("--data", default="data/dataset_ml.csv")
     parser.add_argument("--out", default="benchmark")
     args = parser.parse_args()
@@ -120,23 +140,88 @@ def main():
 
     print("Chargement des données...", flush=True)
     seeds = list(range(args.seeds))
+    heavy_seeds = list(range(args.seeds if args.heavy_seeds is None else args.heavy_seeds))
+
+    # Sauvegarde de chaque exécution terminée : relancer la même commande reprend là où elle s'est arrêtée.
+    # La clé change dès que le code du dossier src/prediction, les données ou un réglage change.
+    cache = None
+    if not args.no_cache:
+        data_file = os.stat(args.data)
+        cache = RunCache(args.cache_dir, config_key(
+            code=source_fingerprint("src/prediction"), data=f"{data_file.st_size}-{int(data_file.st_mtime)}",
+            max_epochs=args.max_epochs, patience=args.patience, refit=not args.no_refit,
+            half_life=args.half_life, bias_window=args.bias_window,
+        ))
+        print(f"Sauvegarde des exécutions : {cache.directory}", flush=True)
+
     results = []
-    # Piste A (météo + calendrier) puis piste B (avec niveau récent) : deux jeux de variables différents
-    for track, label in (("A", "météo + calendrier"), ("B", "avec niveau récent")):
+    smoothing_choices: dict = {}
+    timestral_model = None
+    started = time.time()
+
+    # 1. Références, lissage exponentiel et Timestral : rapides. Une erreur apparaît tout de suite,
+    #    et non après des heures d'entraînement.
+    full_a = load_full_dataset(args.data)
+    if not args.no_baselines:
+        results += run_baselines(full_a, load_reference_forecasts(args.data), args.test_years)
+        # Série temporelle seule (lissage exponentiel) : paramètres choisis sur la validation de chaque année
+        print("Lissage exponentiel (Holt-Winters)...", flush=True)
+        smoothing, smoothing_choices = run_tuned_reference(
+            full_a, load_smoothing_candidates(args.data), args.test_years, "ts_holt_winters")
+        results += smoothing
+
+        # Modèle de fondation : aucun entraînement, il lit l'historique et prévoit (téléchargement des poids au 1er appel)
+        if not args.no_timestral:
+            if timestral_available():
+                print(f"Timestral ({args.timestral_model})...", flush=True)
+                forecaster = load_timestral(args.timestral_model)
+                years = sorted({y for t in args.test_years for y in (t - 1, t)})
+                foundation = load_foundation_forecasts(forecaster, years, args.data)
+                results += run_baselines(full_a, foundation, args.test_years)
+                timestral_model = args.timestral_model
+            else:
+                print(f"Timestral n'est pas installé : ignoré ({INSTALL_HINT})", flush=True)
+
+    # 2. Modèles entraînés. Le MLP (long) passe en premier, puis le reste. Piste A (météo + calendrier)
+    #    et piste B (avec niveau récent) n'ont pas les mêmes variables d'entrée.
+    groups = []
+    for track in ("A", "B"):
         track_names = [n for n in names if (n in TRACK_B) == (track == "B")]
-        if not track_names:
-            continue
-        full = load_full_dataset(args.data, level_features=(track == "B"))
-        print(f"Piste {track} ({label}) : {len(full.y)} lignes | {full.X.shape[1]} variables | "
-              f"années de test : {args.test_years}", flush=True)
+        heavy = [n for n in track_names if n in HEAVY_MODELS]
+        light = [n for n in track_names if n not in HEAVY_MODELS]
+        if heavy:
+            groups.append((track, heavy, heavy_seeds))
+        if light:
+            groups.append((track, light, seeds))
+
+    # Nombre total d'exécutions prévues, pour estimer le temps restant
+    total = sum(
+        len(args.test_years) * sum(len(group_seeds) if registry[n](0).stochastic else 1 for n in group_names)
+        for _, group_names, group_seeds in groups
+    )
+    done = [0]
+
+    def progress(track: str, message: str) -> None:
+        done[0] += 1
+        elapsed = time.time() - started
+        remaining = elapsed / done[0] * (total - done[0])
+        print(f"[run {track}] {done[0]}/{total} | écoulé {format_duration(elapsed)} | "
+              f"reste ~{format_duration(remaining)} | {message}", flush=True)
+
+    full_by_track = {"A": full_a}
+    for track, group_names, group_seeds in groups:
+        if track not in full_by_track:
+            full_by_track[track] = load_full_dataset(args.data, level_features=(track == "B"))
+        full = full_by_track[track]
+        print(f"Piste {track} : {', '.join(group_names)} | {len(full.y)} lignes | {full.X.shape[1]} variables | "
+              f"{len(group_seeds)} graine(s) | années de test : {args.test_years}", flush=True)
         results += run_walk_forward(
-            {n: registry[n] for n in track_names}, full, args.test_years, seeds,
-            on_progress=lambda message, track=track: print(f"[run {track}] {message}", flush=True),
+            {n: registry[n] for n in group_names}, full, args.test_years, group_seeds,
+            on_progress=lambda message, track=track: progress(track, message),
             # La correction du biais n'a pas de sens pour la piste B, qui voit déjà le niveau récent
             bias_window_days=(args.bias_window or None) if track == "A" else None,
+            cache=cache,
         )
-    if not args.no_baselines:
-        results += run_baselines(full, load_reference_forecasts(args.data), args.test_years)
     summary = summarize(results)
     by_fold = summarize_by_fold(results)
 
@@ -148,9 +233,12 @@ def main():
             "scheme": "glissant : test T, validation T-1, entraînement <= T-2",
             "test_years": args.test_years,
             "seeds": seeds,
+            "seeds_heavy_models": heavy_seeds,
+            "timestral_model": timestral_model,
             "max_epochs": args.max_epochs,
             "patience": args.patience,
             "refit_on_train_and_val": not args.no_refit,
+            "holt_winters_choices": {str(y): c for y, c in smoothing_choices.items()},
             "bias_correction": {"window_days": args.bias_window, "delay_days": 2, "min_days": 7},
             "recency_half_life_years": args.half_life,
         },
@@ -175,6 +263,12 @@ def main():
         f.write("Moyenne des années de test (chaque année pèse autant). L'écart indiqué après ± est la variation "
                 "entre années.\n\n")
         f.write(overall_table(summary) + "\n\n")
+        f.write("Les lignes `ref_*` sont des références, pas des modèles de la piste A : elles utilisent la "
+                "consommation passée (`ref_naive_j1` : même heure la veille ; `ref_naive_j2` : 48 h avant ; "
+                "`ref_naive_s1` : la semaine précédente) ou les prévisions publiées par RTE (`ref_rte_j1`, "
+                "`ref_rte_j`). `ts_holt_winters` est une série temporelle seule (lissage exponentiel saisonnier "
+                "hebdomadaire, consommation connue jusqu'à 48 h avant, sans météo) ; ses paramètres sont choisis "
+                "sur la validation de chaque année.\n\n")
         f.write("## Détail par année de test\n\n")
         f.write("Le biais par année montre la dérive du niveau de consommation. L'écart après ± est la variation "
                 "entre graines (modèles à aléa).\n\n")

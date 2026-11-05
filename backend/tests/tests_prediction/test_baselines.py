@@ -52,3 +52,16 @@ def test_load_reference_forecasts_alignment(tmp_path):
     j = int(raw.index[raw.consommation == 5][0])
     assert np.isnan(refs["ref_naive_j1"][j]) and np.isnan(refs["ref_naive_s1"][j])   # pas de passé
     assert refs["ref_rte_j1"][i] == 1.0 and refs["ref_rte_j"][i] == 2.0
+
+
+def test_tuned_reference_picks_candidate_on_validation_only_and_never_reads_test():
+    from src.prediction.application.baselines import run_tuned_reference
+    full = make_full()
+    y = np.asarray(full.y)
+    years = np.asarray(full.years)
+    good_on_val = np.where(years == 2022, y, y + 5.0)      # parfait en 2022 (validation de 2023), mauvais ailleurs
+    good_on_test = np.where(years == 2023, y, y + 5.0)     # parfait sur le test 2023, mauvais sur la validation
+    results, choices = run_tuned_reference(full, {"a": good_on_val, "b": good_on_test}, [2023], "ts")
+    assert choices == {2023: "a"}                           # choisi sur la validation, pas sur le test
+    assert results[0].model == "ts" and results[0].test_year == 2023
+    assert results[0].test.bias == 5.0                      # son erreur sur le test n'est pas cachée

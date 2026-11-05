@@ -59,6 +59,7 @@ ses résultats figurent dans le tableau.
 - [x] Références (`ref_naive_j1`, `ref_naive_s1`, `ref_rte_j1`, `ref_rte_j`), classées à part car elles utilisent la consommation passée ou les prévisions d'RTE.
 - [x] Ridge (`adapters/ml/ridge_regressor.py`) : mois et jour en 0/1, `alpha` choisi sur la validation, variantes `ridge` et `ridge_recent`.
 - [x] Diagnostic du biais de niveau et correction du biais récent (`domain/bias_correction.py`, lignes `*_corr`), MAE centrée (`mae_debiased`). Voir `DECISIONS.md`.
+- [x] Lissage exponentiel saisonnier (`domain/smoothing.py`, modèle `ts_holt_winters`) : consommation seule, paramètres choisis sur la validation de chaque année.
 - [x] Piste B, premiers modèles : `ridge_niveau` et `lightgbm_niveau` avec variables de niveau récent (`domain/level.py`, prévision faite avec les données connues jusqu'à t - 48 h) et référence `ref_naive_j2`.
 
 ## 5. Architecture (hexagonale, conservée)

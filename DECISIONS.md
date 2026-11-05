@@ -78,6 +78,43 @@ deviner.
 - **Référence honnête** : la naïve J-1 utilise 24 h d'information, alors que la piste B en a 48. On ajoute
   `ref_naive_j2` (même heure, 48 h avant) pour comparer à information égale.
 
+### 3.3. Une série temporelle seule : le lissage exponentiel (`domain/smoothing.py`)
+
+Troisième réponse au changement de niveau, sans la météo : un modèle de Holt-Winters (niveau et profil
+hebdomadaire de 168 heures, lissés exponentiellement), qui suit le niveau par construction.
+
+- **Même information que la piste B** : la prévision de l'heure t n'utilise que la consommation connue
+  jusqu'à t − 48 h. Un test vérifie qu'on peut bouleverser les données récentes sans changer les prévisions
+  des 48 premières heures.
+- **Paramètres choisis sur la validation**, pour chaque année de test : le couple (alpha pour le niveau, gamma
+  pour le profil) qui minimise la MAE de l'année T − 1. Le test ne sert jamais au choix. La première grille
+  (alpha 0,003 à 0,1) donnait un meilleur couple au bord ; elle a été élargie (alpha 0,01 à 0,4, gamma 0,01 à
+  0,3) sur ce seul critère de validation.
+- **Un piège connu** : sur des données horaires, un alpha trop grand fait suivre au niveau le cycle
+  journalier avant que le profil ne soit appris ; c'est pourquoi la grille contient surtout des alpha faibles.
+- **Classement** : ni référence, ni piste A ou B. C'est une quatrième famille, « série temporelle »,
+  puisqu'elle n'utilise ni météo ni calendrier mais apprend des paramètres.
+
+### 3.4. Un modèle de fondation : Timestral (`domain/foundation.py`)
+
+Timestral (Mistral, octobre 2026, poids ouverts) est un modèle de séries temporelles préentraîné : on ne l'entraîne
+pas sur nos données, on lui donne un historique et il prévoit la suite. Deux variantes sont évaluées :
+`ts_timestral` (consommation seule) et `ts_timestral_meteo` (avec la température moyenne et les jours fériés).
+
+- **Même hypothèse que la piste B** : l'historique s'arrête 48 h avant le début du jour prévu, donc chaque
+  heure est prévue avec un retard d'au moins 48 h (de 48 h à 71 h). Un test vérifie que modifier les données
+  postérieures à l'origine ne change pas la prévision.
+- **Réglages fixés a priori, non optimisés** : historique de 8 semaines (1344 h), modèle de 209 M de
+  paramètres, prévision médiane (quantile 0,5) comme prévision ponctuelle.
+- **La météo est « parfaite »** : la météo observée sert de prévision de météo, comme pour tous les autres
+  modèles du projet. Un usage réel recevrait une vraie prévision, moins exacte.
+- **Dépendance optionnelle** : `pip install git+https://github.com/mistralai/timestral.git` (absente de
+  `pyproject.toml` pour ne pas alourdir l'image de l'API). Sans elle, le benchmark ignore Timestral et le dit.
+- **Licence** : poids sous licence MIT modifiée (interdiction d'usage au-delà de 20 M$ de revenu mensuel pour
+  l'entreprise de l'utilisateur) : sans objet pour un projet personnel, mais à connaître.
+- **Les résultats annoncés par Mistral** (premier rang sur plusieurs classements publics) sont ceux de
+  Mistral, sur d'autres données. Ce qui compte ici est la mesure sur notre protocole : **non encore mesurée**.
+
 ## 4. Nouvelle métrique : la MAE centrée
 
 `mae_debiased` = MAE une fois le biais moyen retiré. Elle sépare deux questions que la MAE brute mélange :
@@ -97,6 +134,7 @@ modèles de la piste A.
 | **Piste B** ridge_niveau | 2,02 | 1,82 | +1,01 |
 | **Piste A** lightgbm_corr | 1,71 | 1,71 | +0,11 |
 | **Piste A** lightgbm_recent_corr | 1,75 | 1,75 | +0,11 |
+| **Série temporelle** ts_holt_winters | 2,39 | 2,39 | −0,03 |
 | ref_naive_j1 | 2,57 | 2,57 | −0,01 |
 | **Piste A** lightgbm_recent | 2,65 | 1,92 | +2,24 |
 | **Piste A** lightgbm | 2,91 | 1,92 | +2,60 |
@@ -119,7 +157,11 @@ Ce que cela dit, et ce que cela ne dit pas :
    pas. Elles sont un plafond de comparaison, pas un concurrent.
 5. **Le Ridge est derrière LightGBM dans toutes les conditions**, y compris avec le niveau récent : la relation
    entre météo et consommation n'est pas linéaire.
-6. **Non mesuré** : le MLP PyTorch sur ce protocole complet (son lancement complet est prévu à part). Dans
+6. **Le lissage exponentiel, sans météo, fait 2,39 GW** avec un biais quasi nul : mieux que la naïve J-1 (2,57 GW)
+   et que LightGBM brut (2,91 GW), car il suit le niveau. Mais il reste derrière LightGBM corrigé (1,71 GW) et
+   LightGBM avec niveau récent (1,42 GW) : la météo apporte environ 1 GW de plus. Cet écart n'est valable
+   que pour ce protocole et ce modèle de série temporelle ; un SARIMAX ou un réseau de séquence pourraient faire mieux.
+7. **Non mesuré** : le MLP PyTorch sur ce protocole complet (son lancement complet est prévu à part). Dans
    `RESULTS.md`, le « ± » du classement global est l'écart entre années de test ; l'écart entre graines (LightGBM)
    est dans le détail par année. Le Ridge, déterministe, n'en a pas.
 
@@ -141,6 +183,6 @@ Ce que cela dit, et ce que cela ne dit pas :
 
 - Lancement complet du MLP et des variantes avec 5 graines.
 - Combiner niveau récent et correction du biais, et mesurer ce que la combinaison apporte.
-- Autres modèles de la piste B (GRU, CNN 1D, TCN) puis modèles de fondation (Chronos, TimesFM).
+- Autres séries temporelles et modèles de séquence (SARIMAX, GRU, CNN 1D, TCN) puis modèles de fondation (Chronos, TimesFM).
 - Surveiller le biais glissant en production et réentraîner au-delà d'un seuil (non commencé).
 - Déploiement d'une démo (section 10 du CDC).

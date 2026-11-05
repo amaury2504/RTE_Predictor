@@ -287,3 +287,27 @@ def test_bias_correction_adds_a_corr_row_and_removes_a_constant_offset():
     assert corrected[1].test.mae < corrected[0].test.mae
     assert abs(corrected[1].test.bias) < abs(corrected[0].test.bias)
     assert corrected[0].test.mae_debiased is not None
+
+
+def test_run_cache_skips_finished_runs_and_survives_interruption(tmp_path):
+    from src.prediction.application.run_cache import RunCache
+
+    full = make_full(first_year=2020, last_year=2024, rows_per_year=24 * 30)
+    data = split_for_test_year(full, 2024)
+    cache = RunCache(str(tmp_path), "cle")
+    first, second = MeanRegressor(), MeanRegressor()
+    run_benchmark({"mean": lambda seed: first}, data, [0], test_year=2024, cache=cache)
+    assert first.calls != []
+    again = run_benchmark({"mean": lambda seed: second}, data, [0], test_year=2024, cache=cache)
+    assert second.calls == []                              # rien n a ete reentraine
+    assert again[0].test.mae >= 0
+    next(tmp_path.rglob("*.pkl")).write_bytes(b"pas du pickle")   # fichier tronque : l execution est refaite
+    third = MeanRegressor()
+    run_benchmark({"mean": lambda seed: third}, data, [0], test_year=2024, cache=cache)
+    assert third.calls != []
+
+
+def test_run_cache_key_changes_with_settings():
+    from src.prediction.application.run_cache import config_key
+    assert config_key(a=1, b="x") == config_key(b="x", a=1)
+    assert config_key(a=1) != config_key(a=2)

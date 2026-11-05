@@ -1,6 +1,6 @@
 import type { BenchmarkKpiKey, BenchmarkRow } from "../types/api"
 
-export type ModelKind = "reference" | "trackA" | "trackB"
+export type ModelKind = "reference" | "trackA" | "trackB" | "series"
 
 export interface ModelInfo {
     kind: ModelKind
@@ -13,15 +13,17 @@ export const KIND_COLOR: Record<ModelKind, string> = {
     trackA: "#3987e5",
     reference: "#d95926",
     trackB: "#199e70",
+    series: "#c98500",
 }
 
 export const KIND_LABEL: Record<ModelKind, string> = {
     trackA: "Piste A : météo et calendrier",
     trackB: "Piste B : avec la consommation récente",
+    series: "Séries temporelles et modèles de fondation",
     reference: "Référence",
 }
 
-export const KIND_ORDER: ModelKind[] = ["trackA", "trackB", "reference"]
+export const KIND_ORDER: ModelKind[] = ["trackA", "trackB", "series", "reference"]
 
 const REFERENCES: Record<string, { label: string; description: string }> = {
     ref_rte_j: { label: "Prévision RTE du jour", description: "Prévision publiée par RTE le jour même. Elle dispose d'informations que ce projet n'a pas : c'est un plafond de comparaison." },
@@ -37,7 +39,24 @@ const BASES: Record<string, { label: string; description: string }> = {
     mlp: { label: "MLP PyTorch", description: "Réseau de neurones dense." },
 }
 
+const SERIES: Record<string, { label: string; description: string }> = {
+    ts_timestral: {
+        label: "Timestral (consommation seule)",
+        description: "Modèle de fondation de Mistral, sans aucun entraînement sur nos données : il lit les 8 dernières semaines de consommation (connues jusqu'à 48 h avant) et prévoit la suite.",
+    },
+    ts_timestral_meteo: {
+        label: "Timestral + météo",
+        description: "Le même modèle de fondation, avec en plus la température moyenne et les jours fériés connus à l'avance. La météo observée sert de prévision parfaite, comme pour les autres modèles.",
+    },
+    ts_holt_winters: {
+        label: "Holt-Winters (lissage exponentiel)",
+        description: "Niveau et profil hebdomadaire lissés exponentiellement, sans météo ni calendrier. Utilise la consommation connue jusqu'à 48 h avant ; ses deux paramètres sont choisis sur la validation de chaque année.",
+    },
+}
+
 export function describeModel(name: string): ModelInfo {
+    const series = SERIES[name]
+    if (series) return { kind: "series", ...series }
     const reference = REFERENCES[name]
     if (reference) return { kind: "reference", ...reference }
 
@@ -107,4 +126,4 @@ export function rankModels(rows: BenchmarkRow[]): string[] {
 }
 
 /** Sélection de départ de la comparaison : un exemple de chaque famille. */
-export const ESSENTIAL_MODELS = ["ref_rte_j", "ref_naive_j1", "ridge", "lightgbm", "lightgbm_corr", "lightgbm_niveau"]
+export const ESSENTIAL_MODELS = ["ref_rte_j", "ref_naive_j1", "ts_holt_winters", "ridge", "lightgbm", "lightgbm_corr", "lightgbm_niveau"]

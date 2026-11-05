@@ -30,3 +30,33 @@ def run_baselines(full: FullDataset, references: dict[str, np.ndarray], test_yea
                 continue
             results.append(RunResult(name, None, 0.0, 0.0, val, test, year))
     return results
+
+
+def run_tuned_reference(
+    full: FullDataset, candidates: dict[str, np.ndarray], test_years: list[int], name: str,
+) -> tuple[list[RunResult], dict[int, str]]:
+    """Référence à paramètres : pour chaque année de test T, garde le candidat qui a la plus petite MAE sur la
+    validation (année T-1), puis l'évalue sur T. Le test ne sert jamais au choix.
+
+    Returns:
+        Les exécutions (une par année de test) et le candidat retenu pour chaque année.
+    """
+    y = np.asarray(full.y)
+    years = np.asarray(full.years)
+    results: list[RunResult] = []
+    choices: dict[int, str] = {}
+    for year in test_years:
+        val_mask = years == year - 1
+
+        def val_mae(prediction: np.ndarray) -> float:
+            ok = val_mask & np.isfinite(prediction)
+            return float(np.mean(np.abs(prediction[ok] - y[ok]))) if ok.any() else float("inf")
+
+        best = min(candidates, key=lambda key: val_mae(np.asarray(candidates[key], dtype=float)))
+        prediction = np.asarray(candidates[best], dtype=float)
+        test, val = _kpis_on_year(full, prediction, year), _kpis_on_year(full, prediction, year - 1)
+        if test is None or val is None:
+            continue
+        choices[year] = best
+        results.append(RunResult(name, None, 0.0, 0.0, val, test, year))
+    return results, choices

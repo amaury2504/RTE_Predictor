@@ -6,7 +6,7 @@ strict. L'application web sert un modèle PyTorch ; le benchmark compare Ridge, 
 simples, avec et sans la consommation récente.
 
 Projet pédagogique de bout en bout : données (RTE eco2mix 2012-2024, Open-Meteo), API FastAPI, interface
-React, benchmark reproductible, 290 tests automatisés.
+React, benchmark reproductible, 310 tests automatisés.
 
 ## Ce que ce projet montre
 
@@ -32,6 +32,7 @@ consommation moyenne d'environ 50 GW. Le biais est positif quand le modèle sure
 | Prévision RTE du jour (référence) | 1,05 | 0,68 | -0,95 | prévisions RTE |
 | **LightGBM + niveau récent** | **1,42** | 1,27 | +0,90 | météo, calendrier, consommation passée |
 | **LightGBM + correction du biais récent** | 1,71 | 1,71 | +0,11 | météo, calendrier |
+| Lissage exponentiel (Holt-Winters) | 2,39 | 2,39 | -0,03 | consommation passée seule |
 | Naïve J-1 (même heure la veille) | 2,57 | 2,57 | -0,01 | consommation passée |
 | LightGBM | 2,91 | 1,92 | +2,60 | météo, calendrier |
 | Ridge + correction du biais récent | 2,98 | 2,98 | +0,12 | météo, calendrier |
@@ -169,9 +170,18 @@ Les résultats sont écrits dans `benchmark/` (`results.json` et `RESULTS.md`). 
 | `*_recent` | Idem, avec les années récentes pondérées (demi-vie de 3 ans, choisie a priori, non réglée) |
 | `*_corr` (ajoutés automatiquement) | Idem, avec correction du biais des 28 derniers jours |
 | `ridge_niveau`, `lightgbm_niveau` | Piste B : en plus, la consommation récente connue jusqu'à 48 h avant |
+| `ts_holt_winters` (ajouté automatiquement) | Série temporelle seule : lissage exponentiel saisonnier hebdomadaire, paramètres choisis sur la validation |
+| `ts_timestral`, `ts_timestral_meteo` (ajoutés si le paquet est installé) | Modèle de fondation de Mistral, sans entraînement : consommation seule, ou avec température et jours fériés |
 | `ref_*` (ajoutés automatiquement) | Références : naïves (J-1, J-2, semaine) et prévisions RTE |
 
-Les tests : `cd backend && python -m pytest tests -q` (290 tests).
+**Tout lancer d'une traite** (par exemple la nuit) : `powershell -ExecutionPolicy Bypass -File backend\scripts\run_night.ps1`.
+Le MLP passe en premier (4 graines), puis le reste. Chaque exécution terminée est sauvegardée dans
+`backend/benchmark_cache/` : après une interruption, relancer la même commande reprend là où elle s'est arrêtée.
+
+**Timestral** (facultatif) : `pip install git+https://github.com/mistralai/timestral.git` dans l'environnement
+du backend. Sans lui, le benchmark ignore ces deux lignes et le signale.
+
+Les tests : `cd backend && python -m pytest tests -q` (310 tests).
 
 ---
 
@@ -186,7 +196,7 @@ RTE_Predictor/
 │   │   ├── auth/           # Authentification (JWT, bcrypt)
 │   │   ├── electricity/    # Données de consommation
 │   │   └── prediction/
-│   │       ├── domain/         # Variables, découpages, KPI, correction du biais, niveau récent
+│   │       ├── domain/         # Variables, découpages, KPI, correction du biais, niveau récent, lissage
 │   │       ├── ports/          # Contrat d'un modèle (RegressorPort)
 │   │       ├── application/    # Benchmark, références
 │   │       └── adapters/       # Modèles (Ridge, LightGBM, MLP), chargement des données
@@ -198,12 +208,17 @@ RTE_Predictor/
     └── src/                # Pages, composants, contexte d'authentification, services d'API
 ```
 
+## Déploiement
+
+Une configuration Docker prête à l'emploi est dans [deploy/](deploy/README.md) : API, frontend, reverse proxy
+commun avec HTTPS automatique, volume pour le modèle et les bases. Un serveur de 2 vCPU et 4 Go de RAM suffit.
+
 ## Limites connues
 
 - Le modèle de l'API est le MLP initial ; les modèles du benchmark ne sont pas encore servis par l'API.
-- Le mode invité (`POST /auth/guest`) délivre un jeton sans identifiants : voulu pour la démo, à protéger avant
-  toute exposition publique.
-- Pas de déploiement en ligne pour l'instant (adresses locales en dur ; voir la section 10 du CDC).
+- Le mode invité (`POST /auth/guest`) délivre un jeton sans identifiants : voulu pour la démo. Il peut lire et
+  prédire mais pas écrire, les tentatives sont limitées par adresse IP, et `GUEST_ENABLED=false` le coupe.
+- Les fichiers de déploiement (Docker, reverse proxy) sont écrits mais pas encore éprouvés sur un vrai serveur.
 - La cause du changement de niveau de la consommation après 2022 n'est pas établie.
 
 ## Variables d'environnement

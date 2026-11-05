@@ -101,12 +101,15 @@ def load_foundation_forecasts(
     dataset_path: str = "data/dataset_ml.csv",
     context_hours: int = 1344,
     with_weather: bool = True,
+    on_progress=None,
+    prefix: str = "ts_timestral",
 ) -> dict[str, np.ndarray]:
     """Prévisions d'un modèle de fondation pour tous les jours des `years`, alignées sur `load_full_dataset`.
 
-    - ts_timestral        : consommation seule (historique connu jusqu'à 48 h avant)
-    - ts_timestral_meteo  : en plus, température nationale moyenne et jour férié, connus à l'avance
+    - <prefix>        : consommation seule (historique connu jusqu'à 48 h avant)
+    - <prefix>_meteo  : en plus, température nationale moyenne et jour férié, connus à l'avance
       (la météo observée sert de prévision parfaite, comme pour les modèles de la piste A)
+    `prefix` contient la taille du modèle (ex. ts_timestral_28m) pour distinguer plusieurs tailles.
     """
     raw = pd.read_csv(dataset_path, encoding="utf-8")
     days_utc = pd.to_datetime(raw["date"], format="%d/%m/%Y")
@@ -115,11 +118,16 @@ def load_foundation_forecasts(
     wanted = set(years)
     target_days = sorted(d for d in days_utc.unique() if pd.Timestamp(d).year in wanted)
 
-    refs = {"ts_timestral": foundation_forecasts(forecaster, utc, actual, target_days, context_hours)}
+    def report(name: str):
+        return (lambda done, total: on_progress(name, done, total)) if on_progress else None
+
+    refs = {prefix: foundation_forecasts(
+        forecaster, utc, actual, target_days, context_hours, on_progress=report(prefix))}
     if with_weather:
         features = build_features(raw)
         temperature_cols = [c for c in features.columns if c.startswith("temperature_") and not c.endswith("_squared")]
         covariates = np.column_stack([features[temperature_cols].mean(axis=1), features["is_holiday"]])
-        refs["ts_timestral_meteo"] = foundation_forecasts(
-            forecaster, utc, actual, target_days, context_hours, covariates=covariates)
+        refs[f"{prefix}_meteo"] = foundation_forecasts(
+            forecaster, utc, actual, target_days, context_hours, covariates=covariates,
+            on_progress=report(f"{prefix}_meteo"))
     return refs

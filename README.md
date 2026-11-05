@@ -171,7 +171,7 @@ Les résultats sont écrits dans `benchmark/` (`results.json` et `RESULTS.md`). 
 | `*_corr` (ajoutés automatiquement) | Idem, avec correction du biais des 28 derniers jours |
 | `ridge_niveau`, `lightgbm_niveau` | Piste B : en plus, la consommation récente connue jusqu'à 48 h avant |
 | `ts_holt_winters` (ajouté automatiquement) | Série temporelle seule : lissage exponentiel saisonnier hebdomadaire, paramètres choisis sur la validation |
-| `ts_timestral`, `ts_timestral_meteo` (ajoutés si le paquet est installé) | Modèle de fondation de Mistral, sans entraînement : consommation seule, ou avec température et jours fériés |
+| `ts_timestral_209m`, `ts_timestral_28m` et leurs variantes `_meteo` (ajoutés si le paquet est installé) | Modèle de fondation de Mistral (209 M ou 28 M de paramètres), sans entraînement : consommation seule, ou avec température et jours fériés |
 | `ref_*` (ajoutés automatiquement) | Références : naïves (J-1, J-2, semaine) et prévisions RTE |
 
 **Tout lancer d'une traite** (par exemple la nuit) : `powershell -ExecutionPolicy Bypass -File backend\scripts\run_night.ps1`.

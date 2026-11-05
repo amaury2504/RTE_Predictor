@@ -64,6 +64,24 @@ def format_duration(seconds: float) -> str:
     return f"{minutes // 60} h {minutes % 60:02d}" if minutes >= 60 else f"{minutes} min"
 
 
+def timestral_progress(start: float, variants: int):
+    """Barre de progression en une seule ligne du terminal (réécrite sur place) pour Timestral."""
+    state = {"variant": 0, "last_name": None}
+
+    def report(name: str, done: int, total: int) -> None:
+        if state["last_name"] != name:
+            state["variant"] += 1
+            state["last_name"] = name
+        share = (state["variant"] - 1 + done / total) / variants
+        elapsed = time.time() - start
+        remaining = elapsed / share * (1 - share) if share > 0 else 0
+        filled = int(30 * share)
+        print(f"\r  Timestral [{'#' * filled}{'.' * (30 - filled)}] {share:4.0%} | {name} {done}/{total} jours | "
+              f"écoulé {format_duration(elapsed)} | reste ~{format_duration(remaining)}   ", end="", flush=True)
+
+    return report
+
+
 def fmt(value, digits=2):
     return "—" if value is None else f"{value:.{digits}f}"
 
@@ -123,8 +141,9 @@ def main():
     parser.add_argument("--heavy-seeds", type=int, default=None,
                         help="nombre de graines pour les modèles longs (MLP) ; défaut : même valeur que --seeds")
     parser.add_argument("--no-timestral", action="store_true", help="ne pas évaluer Timestral (modèle de fondation)")
-    parser.add_argument("--timestral-model", default="mistralai/Timestral-209M",
-                        help="identifiant Hugging Face du modèle Timestral")
+    parser.add_argument("--timestral-models", nargs="+",
+                        default=["mistralai/Timestral-209M", "mistralai/Timestral-28M"],
+                        help="identifiants Hugging Face des tailles de Timestral à évaluer")
     parser.add_argument("--no-cache", action="store_true",
                         help="ne pas sauvegarder ni relire les exécutions terminées")
     parser.add_argument("--cache-dir", default="benchmark_cache")
@@ -156,7 +175,7 @@ def main():
 
     results = []
     smoothing_choices: dict = {}
-    timestral_model = None
+    timestral_models: list[str] = []
     started = time.time()
 
     # 1. Références, lissage exponentiel et Timestral : rapides. Une erreur apparaît tout de suite,
@@ -173,12 +192,17 @@ def main():
         # Modèle de fondation : aucun entraînement, il lit l'historique et prévoit (téléchargement des poids au 1er appel)
         if not args.no_timestral:
             if timestral_available():
-                print(f"Timestral ({args.timestral_model})...", flush=True)
-                forecaster = load_timestral(args.timestral_model)
                 years = sorted({y for t in args.test_years for y in (t - 1, t)})
-                foundation = load_foundation_forecasts(forecaster, years, args.data)
-                results += run_baselines(full_a, foundation, args.test_years)
-                timestral_model = args.timestral_model
+                progress_bar = timestral_progress(time.time(), 2 * len(args.timestral_models))
+                for model_id in args.timestral_models:
+                    size = model_id.split("-")[-1].lower()               # ex. "209m"
+                    print(f"Timestral {size} ({model_id})...", flush=True)
+                    foundation = load_foundation_forecasts(
+                        load_timestral(model_id), years, args.data,
+                        on_progress=progress_bar, prefix=f"ts_timestral_{size}")
+                    print(flush=True)
+                    results += run_baselines(full_a, foundation, args.test_years)
+                    timestral_models.append(model_id)
             else:
                 print(f"Timestral n'est pas installé : ignoré ({INSTALL_HINT})", flush=True)
 
@@ -218,8 +242,8 @@ def main():
         results += run_walk_forward(
             {n: registry[n] for n in group_names}, full, args.test_years, group_seeds,
             on_progress=lambda message, track=track: progress(track, message),
-            # La correction du biais n'a pas de sens pour la piste B, qui voit déjà le niveau récent
-            bias_window_days=(args.bias_window or None) if track == "A" else None,
+            # Aussi appliquée à la piste B : le niveau récent laisse un biais résiduel que la correction peut retirer
+            bias_window_days=args.bias_window or None,
             cache=cache,
         )
     summary = summarize(results)
@@ -234,7 +258,7 @@ def main():
             "test_years": args.test_years,
             "seeds": seeds,
             "seeds_heavy_models": heavy_seeds,
-            "timestral_model": timestral_model,
+            "timestral_models": timestral_models,
             "max_epochs": args.max_epochs,
             "patience": args.patience,
             "refit_on_train_and_val": not args.no_refit,

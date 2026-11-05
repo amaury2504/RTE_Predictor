@@ -9,7 +9,7 @@ Le modèle est reçu par injection : n'importe quel objet qui a une méthode
 `forecast(context, prediction_length, known_covariates=None)` renvoyant un objet avec `.median` de forme
 (séries, variables, horizon). Cela permet de le tester sans télécharger de poids.
 """
-from typing import Protocol, Sequence
+from typing import Callable, Protocol, Sequence
 
 import numpy as np
 import pandas as pd
@@ -32,6 +32,7 @@ def foundation_forecasts(
     covariates: np.ndarray | None = None,
     batch_size: int = 32,
     min_observed: float = 0.5,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> np.ndarray:
     """Prévision de chaque heure des jours cibles, alignée sur `utc_index` (NaN ailleurs).
 
@@ -43,6 +44,7 @@ def foundation_forecasts(
         covariates: tableau (lignes, variables) aligné sur `utc_index`, connu à l'avance (ex. température
             observée, utilisée comme prévision parfaite de la météo, comme pour les autres modèles).
         min_observed: part minimale d'heures connues dans l'historique ; sinon le jour est ignoré.
+        on_progress: appelée après chaque lot avec (jours prévus, jours à prévoir), pour afficher l'avancement.
     """
     series = pd.Series(np.asarray(actual, dtype=float), index=utc_index)
     if series.index.has_duplicates:
@@ -88,5 +90,7 @@ def foundation_forecasts(
             for hour in range(DAY_HOURS):
                 if first + hour < n:
                     forecast_grid[first + hour] = values[DELAY_HOURS - 1 + hour]   # pas k=48+hour -> position k-1
+        if on_progress:
+            on_progress(min(i + batch_size, len(jobs)), len(jobs))
 
     return pd.Series(forecast_grid, index=grid).reindex(utc_index).to_numpy()

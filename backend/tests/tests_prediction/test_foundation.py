@@ -77,3 +77,11 @@ def test_days_without_enough_history_or_data_are_skipped():
 def test_duplicate_timestamps_rejected():
     with pytest.raises(ValueError):
         foundation_forecasts(PositionForecaster(), pd.DatetimeIndex([HOURS[0], HOURS[0]]), np.ones(2), [HOURS[0]])
+
+
+def test_progress_callback_reports_every_batch():
+    seen = []
+    days = [pd.Timestamp("2024-01-20") + pd.Timedelta(days=i) for i in range(5)]
+    foundation_forecasts(MeanForecaster(), HOURS, np.ones(len(HOURS)), days, context_hours=168,
+                         batch_size=2, on_progress=lambda done, total: seen.append((done, total)))
+    assert seen == [(2, 5), (4, 5), (5, 5)]

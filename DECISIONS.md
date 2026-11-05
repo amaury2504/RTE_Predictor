@@ -98,16 +98,22 @@ hebdomadaire de 168 heures, lissés exponentiellement), qui suit le niveau par c
 ### 3.4. Un modèle de fondation : Timestral (`domain/foundation.py`)
 
 Timestral (Mistral, octobre 2026, poids ouverts) est un modèle de séries temporelles préentraîné : on ne l'entraîne
-pas sur nos données, on lui donne un historique et il prévoit la suite. Deux variantes sont évaluées :
-`ts_timestral` (consommation seule) et `ts_timestral_meteo` (avec la température moyenne et les jours fériés).
+pas sur nos données, on lui donne un historique et il prévoit la suite. Deux tailles (209 M et 28 M de paramètres)
+et deux variantes chacune sont évaluées : consommation seule (`ts_timestral_209m`, `ts_timestral_28m`) et avec la
+température moyenne et les jours fériés (`..._meteo`). Comparer les tailles dit si le gain vaut le coût de calcul :
+la variante météo de la grande taille coûte environ 5 fois plus que la variante sans météo.
 
 - **Même hypothèse que la piste B** : l'historique s'arrête 48 h avant le début du jour prévu, donc chaque
   heure est prévue avec un retard d'au moins 48 h (de 48 h à 71 h). Un test vérifie que modifier les données
   postérieures à l'origine ne change pas la prévision.
-- **Réglages fixés a priori, non optimisés** : historique de 8 semaines (1344 h), modèle de 209 M de
-  paramètres, prévision médiane (quantile 0,5) comme prévision ponctuelle.
+- **Réglages fixés a priori, non optimisés** : historique de 8 semaines (1344 h), prévision médiane
+  (quantile 0,5) comme prévision ponctuelle.
 - **La météo est « parfaite »** : la météo observée sert de prévision de météo, comme pour tous les autres
-  modèles du projet. Un usage réel recevrait une vraie prévision, moins exacte.
+  modèles du projet qui utilisent la météo. Un usage réel recevrait une vraie prévision, moins exacte. **Cela
+  avantage tous nos modèles météo face aux prévisions d'RTE**, qui reposent sur une météo prévue : la comparaison
+  avec `ref_rte_j` et `ref_rte_j1` est donc plutôt favorable à nos modèles.
+- **Premier résultat (taille 209 M, essai isolé)** : Timestral avec météo fait 1,30 GW de MAE (biais −0,08 GW),
+  sans aucun entraînement sur nos données ; sans météo, 2,20 GW. À confirmer par le lancement complet, avec le 28 M.
 - **Dépendance optionnelle** : `pip install git+https://github.com/mistralai/timestral.git` (absente de
   `pyproject.toml` pour ne pas alourdir l'image de l'API). Sans elle, le benchmark ignore Timestral et le dit.
 - **Licence** : poids sous licence MIT modifiée (interdiction d'usage au-delà de 20 M$ de revenu mensuel pour
@@ -152,7 +158,9 @@ Ce que cela dit, et ce que cela ne dit pas :
    réentraîner.
 3. **Le niveau récent comme variable donne 1,42 GW** (piste B), mieux que la correction (1,71 GW) mais avec
    un biais résiduel (+0,90 GW) : le modèle voit le niveau, mais apprend sa relation à la consommation sur des
-   années où le niveau était différent. Les deux approches pourraient se combiner ; cela n'a pas été testé.
+   années où le niveau était différent. **Les deux approches se combinent** : avec la correction du biais en plus, LightGBM
+   tombe à **1,21 GW** (biais +0,12 GW, MASE 0,47, ± 0,08 GW entre graines), au niveau de la prévision RTE de la veille
+   (1,21 GW), et le Ridge à 1,79 GW. Premier essai isolé, régénéré dans les résultats officiels par le lancement complet.
 4. **Les prévisions d'RTE restent meilleures** (1,05 à 1,21 GW) : elles disposent d'informations qu'on n'a
    pas. Elles sont un plafond de comparaison, pas un concurrent.
 5. **Le Ridge est derrière LightGBM dans toutes les conditions**, y compris avec le niveau récent : la relation

@@ -40,13 +40,21 @@ const BASES: Record<string, { label: string; description: string }> = {
 }
 
 const SERIES: Record<string, { label: string; description: string }> = {
-    ts_timestral: {
-        label: "Timestral (consommation seule)",
-        description: "Modèle de fondation de Mistral, sans aucun entraînement sur nos données : il lit les 8 dernières semaines de consommation (connues jusqu'à 48 h avant) et prévoit la suite.",
+    ts_timestral_209m: {
+        label: "Timestral 209M (consommation seule)",
+        description: "Modèle de fondation de Mistral (209 millions de paramètres), sans aucun entraînement sur nos données : il lit les 8 dernières semaines de consommation (connues jusqu'à 48 h avant) et prévoit la suite.",
     },
-    ts_timestral_meteo: {
-        label: "Timestral + météo",
+    ts_timestral_209m_meteo: {
+        label: "Timestral 209M + météo",
         description: "Le même modèle de fondation, avec en plus la température moyenne et les jours fériés connus à l'avance. La météo observée sert de prévision parfaite, comme pour les autres modèles.",
+    },
+    ts_timestral_28m: {
+        label: "Timestral 28M (consommation seule)",
+        description: "Version plus petite du modèle de fondation de Mistral (28 millions de paramètres) : plus rapide, sans entraînement sur nos données, consommation seule.",
+    },
+    ts_timestral_28m_meteo: {
+        label: "Timestral 28M + météo",
+        description: "La petite version de Timestral, avec en plus la température moyenne et les jours fériés connus à l'avance.",
     },
     ts_holt_winters: {
         label: "Holt-Winters (lissage exponentiel)",

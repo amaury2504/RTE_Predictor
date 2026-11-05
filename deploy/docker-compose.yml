@@ -1,0 +1,33 @@
+# RTE Predictor : API + frontend. Le HTTPS et le nom de domaine sont gérés par le reverse proxy commun du
+# serveur (deploy/server/), auquel le conteneur "web" se rattache via le réseau externe "proxy".
+#
+# Lancer, depuis ce dossier :  docker compose up -d --build
+name: rte-predictor
+
+services:
+  api:
+    build: ../backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Les bases SQLite sont dans le volume : elles survivent aux redémarrages et aux mises à jour
+      DATABASE_URL: sqlite:////app/data/electricity.db
+      DATABASE_AUTH_URL: sqlite:////app/data/auth.db
+    volumes:
+      # Contient model.pth, scaler_X.pkl, scaler_Y.pkl (non versionnés) et les bases SQLite
+      - ./data:/app/data
+    mem_limit: 1g          # PyTorch consomme de la mémoire : on protège les autres projets du serveur
+    networks: [default]
+
+  web:
+    build: ../frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 64m
+    networks: [default, proxy]
+
+networks:
+  proxy:
+    external: true

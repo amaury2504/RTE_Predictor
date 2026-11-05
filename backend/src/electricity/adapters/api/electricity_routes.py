@@ -28,7 +28,7 @@ class ConsumptionRequest(BaseModel):
 class StatusResponse(BaseModel):
     status:str
 
-@electricity_router.post("/consumption",dependencies=[Depends(checker.authorized_request)],response_model=StatusResponse)
+@electricity_router.post("/consumption",dependencies=[Depends(checker.registered_request)],response_model=StatusResponse)
 def store_consumption(data:ConsumptionRequest):
     record=ConsumptionRecord(data.date,data.hour,data.power)
     store_use_case.execute(record)

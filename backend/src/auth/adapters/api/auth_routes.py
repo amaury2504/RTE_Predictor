@@ -1,4 +1,4 @@
-from fastapi import APIRouter,HTTPException
+from fastapi import APIRouter,HTTPException,Depends
 from pydantic import BaseModel
 from src.auth.application.auth_use_cases import RegisterUser,LoginUser,LoginGuest
 from src.auth.adapters.persistence.sqlalchemy_repository_auth import SQLAlchemyUserRepository
@@ -8,6 +8,7 @@ import os
 from dotenv import load_dotenv
 from src.auth.adapters.persistence.sqlalchemy_models_auth import Base,engine
 from src.auth.adapters.api.auth_dependency import CheckAuthorization
+from src.auth.adapters.api.rate_limit import RateLimiter
 from src.auth.domain.exceptions import InvalidCredentialsError,UserAlreadyExistsError
 import logging
 logger = logging.getLogger(__name__)
@@ -17,6 +18,17 @@ load_dotenv()
 
 SECRET_KEY=os.getenv("SECRET_KEY")
 DURATION_TOKEN=float(os.getenv("DURATION_TOKEN"))
+# Le profil invité peut être coupé en production (GUEST_ENABLED=false)
+GUEST_ENABLED=os.getenv("GUEST_ENABLED","true").lower() in ("1","true","yes")
+
+# En production (APP_ENV=production), une clé absente ou trop courte empêche le démarrage
+if os.getenv("APP_ENV")=="production" and (not SECRET_KEY or len(SECRET_KEY)<32 or SECRET_KEY.startswith("REMPLACER")):
+    raise RuntimeError("SECRET_KEY doit être définie (32 caractères minimum) : python -c \"import secrets; print(secrets.token_hex(32))\"")
+
+# Limites par adresse IP contre les essais répétés
+login_limit=RateLimiter(max_calls=10,window_seconds=60)
+register_limit=RateLimiter(max_calls=5,window_seconds=3600)
+guest_limit=RateLimiter(max_calls=60,window_seconds=3600)
 
 
 # Structures immuables
@@ -47,7 +59,7 @@ checker=CheckAuthorization(token_provider)
 
 # Création du premier endpoint (register)
 
-@auth_router.post("/register",response_model=StatusResponse)
+@auth_router.post("/register",response_model=StatusResponse,dependencies=[Depends(register_limit)])
 def register_user(request:LoginRequest)->StatusResponse:
     """J'appelle mon use case Register_User"""
     try:
@@ -60,7 +72,7 @@ def register_user(request:LoginRequest)->StatusResponse:
         logger.warning("Tentative d'inscription échouée : %s", request.mail)
         raise HTTPException(status_code=401,detail="Cet email est déjà enregistré")
 
-@auth_router.post("/login",response_model=TokenResponse)
+@auth_router.post("/login",response_model=TokenResponse,dependencies=[Depends(login_limit)])
 def login_user(request:LoginRequest)->TokenResponse:
     """Je vérifie si mon user peut se login et j'accède à sa demande si c'est le cas"""
     try:
@@ -72,9 +84,11 @@ def login_user(request:LoginRequest)->TokenResponse:
         logger.warning("Tentative de login échouée : %s", request.mail)
         raise HTTPException(status_code=401,detail="Identifiant ou mot de passe incorrect")
 
-@auth_router.post("/guest",response_model=TokenResponse)
+@auth_router.post("/guest",response_model=TokenResponse,dependencies=[Depends(guest_limit)])
 def login_guest()->TokenResponse:
     """Mode démo : délivre un token de profil invité, sans identifiant ni mot de passe"""
+    if not GUEST_ENABLED:
+        raise HTTPException(status_code=403,detail="Le profil invité est désactivé")
     use_case=LoginGuest(token_provider)
     token=use_case.execute()
     logger.info("Connexion en profil invité")

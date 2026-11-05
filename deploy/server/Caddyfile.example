@@ -1,0 +1,20 @@
+# Copier en "Caddyfile" et remplacer les domaines. Chaque domaine doit pointer (enregistrement DNS A) vers
+# l'adresse IP du serveur avant le démarrage, sinon le certificat HTTPS ne peut pas être obtenu.
+#
+# Chaque projet rejoint le réseau Docker "proxy" et expose un conteneur sur un port interne.
+
+rte.example.com {
+	encode gzip
+	reverse_proxy rte-predictor-web-1:80
+}
+
+# Les deux autres projets : adapter le nom du conteneur et le port à leur propre docker-compose.
+orchestrator.example.com {
+	encode gzip
+	reverse_proxy llm-orchestrator-web-1:8000
+}
+
+graphrag.example.com {
+	encode gzip
+	reverse_proxy graphrag-web-1:8000
+}

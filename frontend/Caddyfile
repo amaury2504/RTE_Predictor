@@ -1,0 +1,19 @@
+# Serveur interne du conteneur "web" : fichiers statiques + transmission de /api vers l'API.
+# Le HTTPS est géré en amont par le reverse proxy commun du serveur (deploy/server/).
+{
+	auto_https off
+}
+
+:80 {
+	encode gzip
+
+	handle_path /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

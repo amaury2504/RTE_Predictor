@@ -1,7 +1,8 @@
 import type { PredictionRequest, PredictionResponse, RegionWeather, KpiPoint, KpiReport, BenchmarkResults } from "../types/api"
 import { REGIONS, REGION_COORDS } from "../types/api"
 
-const BASE_URL = "http://localhost:8000"
+// Adresse de l'API : VITE_API_URL à la construction (ex. "/api" derrière le reverse proxy), localhost en développement
+const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000"
 
 export const register = async (mail: string, password: string): Promise<void> => {
     const response = await fetch(`${BASE_URL}/auth/register`, {

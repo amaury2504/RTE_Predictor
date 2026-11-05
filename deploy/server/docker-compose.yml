@@ -1,0 +1,28 @@
+# Reverse proxy commun à tous les projets du serveur : une seule entrée (ports 80 et 443),
+# un nom de domaine par projet, certificats HTTPS obtenus et renouvelés automatiquement.
+#
+# Une seule fois :  docker network create proxy
+# Puis, depuis ce dossier :  docker compose up -d
+name: proxy
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data          # certificats : à conserver
+      - caddy_config:/config
+    mem_limit: 128m
+    networks: [proxy]
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  proxy:
+    external: true

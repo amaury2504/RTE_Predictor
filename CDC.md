@@ -20,11 +20,18 @@ Les modèles ne sont comparés qu'à l'intérieur d'une même piste (les entrée
 ## 3. Protocole d'évaluation (commun à tous les modèles)
 
 - **Données :** `eco2mix-national-cons-def.csv` agrégé à l'heure (GW) et météo Open-Meteo, 13 régions.
-- **Découpage temporel :** entraînement jusqu'à 2021 inclus, validation 2022, test à partir de 2023.
+- **Découpage temporel glissant (« walk-forward ») :** pour chaque année de test T (2022, 2023, 2024) :
+  entraînement jusqu'à T-2, validation T-1, test T. Cela imite un réentraînement annuel et mesure la dérive
+  du niveau de consommation, qui a changé après 2021. Les résultats sont donnés par année et en moyenne.
 - **Jeu de test :** utilisé une seule fois par modèle, à la fin. Aucun réglage dessus.
 - **Normalisation :** apprise sur l'entraînement seul (pas de fuite vers validation/test).
 - **Variables d'entrée :** identiques pour tous les modèles d'une même piste, construites par un code commun.
 - **Réglage :** budget identique pour chaque modèle (même nombre d'essais), évalué sur la validation.
+- **Réentraînement :** après le réglage sur la validation, chaque modèle se réentraîne sur entraînement +
+  validation avec le budget trouvé (nombre d'arbres, d'epochs). Les KPI de validation restent calculés
+  avant ce réentraînement.
+- **Variantes `_recent` :** pondération des lignes selon leur âge (demi-vie en années), pour tester
+  l'effet d'une consommation qui dérive. Ce sont des modèles distincts dans le classement.
 - **Aléa :** modèles à initialisation aléatoire exécutés avec 5 graines. On publie la moyenne et l'écart-type.
 - **Métriques :** MAE (GW), RMSE (GW), MAPE (%), temps d'entraînement, temps de prédiction.
 - **Reproductibilité :** une commande relance l'ensemble et régénère le tableau de résultats.
@@ -45,8 +52,11 @@ ses résultats figurent dans le tableau.
       contrat de modèle (`ports/regressor.py`), orchestration (`application/benchmark.py`), lancement
       (`scripts/run_benchmark.py`).
 - [x] MLP PyTorch branché sur la base commune (normalisation apprise dans `fit`, sur l'entraînement seul).
-- [ ] Lancement complet du MLP (5 graines) et enregistrement des résultats dans `benchmark/`.
-- [ ] Prévision naïve (référence), Ridge, LightGBM.
+- [x] LightGBM (`adapters/ml/lightgbm_regressor.py`), dépendance ajoutée via Poetry.
+- [x] Évaluation glissante sur 3 années de test (`split_for_test_year`, `run_walk_forward`), résultats globaux et par année.
+- [x] Réentraînement sur entraînement + validation (LightGBM, MLP) et variantes `_recent` (poids selon l'âge).
+- [ ] Lancement complet (5 graines) des modèles et enregistrement des résultats dans `benchmark/`.
+- [ ] Références (prévision naïve J-1 et semaine précédente, prévisions officielles RTE si exploitables), Ridge.
 
 ## 5. Architecture (hexagonale, conservée)
 
@@ -90,7 +100,22 @@ Une seule commande relance les quatre modèles et produit un classement identiqu
 
 - Vérifier le comportement de `EvaluateWithPytorch` (il applique le scaler directement à des `PredictionInput`).
 - Réentraîner le modèle avec la normalisation corrigée et noter le score de référence.
-- Ajouter LightGBM aux dépendances du projet.
+- Budget de réglage identique pour tous les modèles (section 3) : pour l'instant le MLP et LightGBM
+  utilisent des hyperparamètres fixes, sans recherche. À uniformiser.
+- Biais de niveau (surestimation systématique). Essai LightGBM, 1 graine, évaluation glissante :
+  biais +1,9 GW (test 2022), +3,6 (2023), +3,1 (2024) pour une MAE de 2,5, 3,7 et 3,3 GW. À météo
+  comparable, la consommation de 2024 est environ 3,7 GW sous celle de 2019. Le glissement mesure la dérive
+  mais ne la corrige pas. Un réentraînement incluant l'année de validation réduit peu le biais
+  (+3,4 en 2023, +2,6 en 2024). Pistes restantes : pondérer les années récentes, fenêtre d'entraînement
+  plus courte, indicateur de niveau récent (consommation moyenne des 365 derniers jours : utilise le passé
+  de la consommation, à classer avec la piste B), ou prédire un rapport au niveau récent.
+  Résultat obtenu : réentraînement sur entraînement + validation et pondération des années récentes
+  (demi-vie 3 ans) font passer LightGBM de MAE 3,14 à 2,65 GW et de biais +2,87 à +2,24 GW (moyenne des
+  3 années de test, 1 graine). Le biais reste présent.
+- Demi-vie de la pondération (3 ans, choisie a priori) : à choisir sur la validation, jamais sur le test.
+- Les écarts mesurés avec une seule graine ne sont pas encore accompagnés d'un écart-type entre graines.
+- Colonnes `Prévision J-1 (MW)` et `Prévision J (MW)` du fichier RTE : vérifier leur complétude et en faire
+  une référence.
 - Décider si les variantes de réseaux de neurones comptent comme des modèles distincts dans le classement.
 
 ## 10. Déploiement d'une démo en ligne (à planifier)

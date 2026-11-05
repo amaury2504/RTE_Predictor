@@ -1,7 +1,8 @@
 """Orchestration du benchmark : entraîne chaque modèle selon le même protocole, mesure ses KPI.
 
 Protocole (voir CDC.md) :
-- même découpage temporel et mêmes variables pour tous les modèles ;
+- évaluation glissante : pour chaque année de test T, entraînement <= T-2, validation T-1, test T ;
+- même découpage et mêmes variables pour tous les modèles ;
 - le jeu de test n'est lu qu'une fois par exécution, après l'entraînement ;
 - les modèles à aléa sont répétés avec plusieurs graines, les autres une seule fois.
 """
@@ -10,11 +11,12 @@ from dataclasses import dataclass
 from statistics import mean, pstdev
 from typing import Callable
 
-from src.prediction.domain.dataset import BenchmarkDataset
+from src.prediction.domain.dataset import BenchmarkDataset, FullDataset, split_for_test_year
 from src.prediction.domain.kpi import KpiReport, compute_kpis
+from src.prediction.domain.recency import recency_weights
 from src.prediction.ports.regressor import RegressorPort
 
-# Indicateurs agrégés dans le tableau de classement (tous lus sur le jeu de test)
+# Indicateurs agrégés dans les tableaux de résultats (tous lus sur le jeu de test)
 SUMMARY_KPIS = ("mae", "rmse", "mape", "wape", "bias", "p95_ae", "r2", "mase")
 
 
@@ -26,15 +28,28 @@ class RunResult:
     predict_seconds: float
     val: KpiReport
     test: KpiReport
+    test_year: int | None = None
 
 
-def evaluate_regressor(regressor: RegressorPort, data: BenchmarkDataset, seed: int | None = None) -> RunResult:
+def evaluate_regressor(
+    regressor: RegressorPort, data: BenchmarkDataset, seed: int | None = None, test_year: int | None = None,
+) -> RunResult:
     """Entraîne un modèle puis calcule ses KPI sur la validation et sur le test."""
+    # Pondération des années récentes, si le modèle en veut : âge mesuré depuis le début de l'année de test
+    w_train = w_val = None
+    if regressor.recency_half_life_years:
+        reference = data.test.timestamps[0]
+        w_train = recency_weights(data.train.timestamps, reference, regressor.recency_half_life_years)
+        w_val = recency_weights(data.val.timestamps, reference, regressor.recency_half_life_years)
+
     t0 = time.perf_counter()
-    regressor.fit(data.train.X, data.train.y, data.val.X, data.val.y)
+    regressor.fit(data.train.X, data.train.y, data.val.X, data.val.y, w_train, w_val)
     fit_seconds = time.perf_counter() - t0
 
-    val_pred = regressor.predict(data.val.X)
+    # Prédictions de validation faites avant un éventuel réentraînement incluant la validation
+    val_pred = regressor.val_predictions_
+    if val_pred is None:
+        val_pred = regressor.predict(data.val.X)
 
     # Le test n'est lu qu'ici, une fois l'entraînement terminé
     t0 = time.perf_counter()
@@ -48,6 +63,7 @@ def evaluate_regressor(regressor: RegressorPort, data: BenchmarkDataset, seed: i
         predict_seconds=predict_seconds,
         val=compute_kpis(data.val.timestamps, val_pred, data.val.y),
         test=compute_kpis(data.test.timestamps, test_pred, data.test.y),
+        test_year=test_year,
     )
 
 
@@ -56,8 +72,9 @@ def run_benchmark(
     data: BenchmarkDataset,
     seeds: list[int],
     on_progress: Callable[[str], None] = lambda message: None,
+    test_year: int | None = None,
 ) -> list[RunResult]:
-    """Exécute chaque modèle : une fois par graine s'il est stochastique, une seule fois sinon."""
+    """Exécute chaque modèle sur un découpage : une fois par graine s'il est stochastique, une fois sinon."""
     results: list[RunResult] = []
     for name, factory in factories.items():
         for i, seed in enumerate(seeds):
@@ -65,28 +82,70 @@ def run_benchmark(
             if i > 0 and not regressor.stochastic:
                 break
             on_progress(f"{name} (graine {seed})")
-            results.append(evaluate_regressor(regressor, data, seed if regressor.stochastic else None))
+            results.append(evaluate_regressor(regressor, data, seed if regressor.stochastic else None, test_year))
     return results
 
 
-def summarize(results: list[RunResult]) -> list[dict]:
-    """Moyenne et écart-type par modèle, triés par MAE de test croissante."""
-    by_model: dict[str, list[RunResult]] = {}
+def run_walk_forward(
+    factories: dict[str, Callable[[int], RegressorPort]],
+    full: FullDataset,
+    test_years: list[int],
+    seeds: list[int],
+    on_progress: Callable[[str], None] = lambda message: None,
+) -> list[RunResult]:
+    """Évaluation glissante : refait tout le protocole pour chaque année de test."""
+    results: list[RunResult] = []
+    for year in test_years:
+        data = split_for_test_year(full, year)
+        results += run_benchmark(
+            factories, data, seeds,
+            on_progress=lambda message, year=year: on_progress(f"test {year} · {message}"),
+            test_year=year,
+        )
+    return results
+
+
+def _aggregate(runs: list[RunResult]) -> dict:
+    """Moyenne et écart-type (entre exécutions) des KPI de test."""
+    row: dict = {"runs": len(runs)}
+    for kpi in SUMMARY_KPIS:
+        values = [getattr(r.test, kpi) for r in runs if getattr(r.test, kpi) is not None]
+        row[kpi] = mean(values) if values else None
+        row[f"{kpi}_std"] = None if not values else (pstdev(values) if len(values) > 1 else 0.0)
+    row["val_mae"] = mean(r.val.mae for r in runs)
+    row["fit_seconds"] = mean(r.fit_seconds for r in runs)
+    row["predict_seconds"] = mean(r.predict_seconds for r in runs)
+    return row
+
+
+def summarize_by_fold(results: list[RunResult]) -> list[dict]:
+    """Une ligne par (année de test, modèle) : moyenne et écart-type entre graines. Triées par année puis MAE."""
+    groups: dict[tuple[int | None, str], list[RunResult]] = {}
     for r in results:
-        by_model.setdefault(r.model, []).append(r)
+        groups.setdefault((r.test_year, r.model), []).append(r)
+    rows = [{"test_year": year, "model": model, **_aggregate(runs)} for (year, model), runs in groups.items()]
+    return sorted(rows, key=lambda row: (row["test_year"] or 0, row["mae"]))
+
+
+def summarize(results: list[RunResult]) -> list[dict]:
+    """Une ligne par modèle sur l'ensemble des années de test, triées par MAE croissante.
+
+    Chaque KPI est la moyenne des moyennes par année (chaque année pèse autant) ; son écart-type
+    mesure la variation ENTRE ANNÉES (0 s'il n'y a qu'une année). La variation entre graines
+    est dans `summarize_by_fold`.
+    """
+    by_model: dict[str, list[dict]] = {}
+    for fold_row in summarize_by_fold(results):
+        by_model.setdefault(fold_row["model"], []).append(fold_row)
 
     rows = []
-    for model, runs in by_model.items():
-        row: dict = {"model": model, "runs": len(runs)}
+    for model, folds in by_model.items():
+        row: dict = {"model": model, "folds": len(folds), "runs": sum(f["runs"] for f in folds)}
         for kpi in SUMMARY_KPIS:
-            values = [getattr(r.test, kpi) for r in runs if getattr(r.test, kpi) is not None]
+            values = [f[kpi] for f in folds if f[kpi] is not None]
             row[kpi] = mean(values) if values else None
-            if not values:
-                row[f"{kpi}_std"] = None
-            else:
-                row[f"{kpi}_std"] = pstdev(values) if len(values) > 1 else 0.0
-        row["val_mae"] = mean(r.val.mae for r in runs)
-        row["fit_seconds"] = mean(r.fit_seconds for r in runs)
-        row["predict_seconds"] = mean(r.predict_seconds for r in runs)
+            row[f"{kpi}_std"] = None if not values else (pstdev(values) if len(values) > 1 else 0.0)
+        for key in ("val_mae", "fit_seconds", "predict_seconds"):
+            row[key] = mean(f[key] for f in folds)
         rows.append(row)
     return sorted(rows, key=lambda row: row["mae"])

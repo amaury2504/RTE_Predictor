@@ -59,6 +59,35 @@ def build_registry(max_epochs: int, patience: int, refit: bool, half_life: float
     }
 
 
+class TeeStdout:
+    """Affiche dans la console et recopie dans un fichier. Une ligne réécrite sur place (retour chariot, comme
+    la barre de progression) n'est écrite dans le fichier que dans son état final, pour ne pas le saturer."""
+
+    def __init__(self, console, path: str):
+        self.console = console
+        self.file = open(path, "a", encoding="utf-8")
+        self._line = ""
+
+    def write(self, text: str) -> int:
+        self.console.write(text)
+        for char in text:
+            if char == "\r":
+                self._line = ""
+            elif char == "\n":
+                self.file.write(self._line + "\n")
+                self.file.flush()
+                self._line = ""
+            else:
+                self._line += char
+        return len(text)
+
+    def flush(self) -> None:
+        self.console.flush()
+
+    def isatty(self) -> bool:
+        return self.console.isatty()
+
+
 def format_duration(seconds: float) -> str:
     minutes = int(seconds // 60)
     return f"{minutes // 60} h {minutes % 60:02d}" if minutes >= 60 else f"{minutes} min"
@@ -147,9 +176,14 @@ def main():
     parser.add_argument("--no-cache", action="store_true",
                         help="ne pas sauvegarder ni relire les exécutions terminées")
     parser.add_argument("--cache-dir", default="benchmark_cache")
+    parser.add_argument("--log", default=None,
+                        help="fichier où recopier ce qui s'affiche (les barres de progression y sont résumées)")
     parser.add_argument("--data", default="data/dataset_ml.csv")
     parser.add_argument("--out", default="benchmark")
     args = parser.parse_args()
+
+    if args.log:
+        sys.stdout = TeeStdout(sys.stdout, args.log)
 
     registry = build_registry(args.max_epochs, args.patience, not args.no_refit, args.half_life)
     names = args.models or list(registry)

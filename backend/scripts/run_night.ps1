@@ -6,11 +6,10 @@
 # relancer ce même script reprend là où il s'est arrêté, sans rien refaire.
 #
 # Usage, depuis n'importe où :   powershell -ExecutionPolicy Bypass -File backend\scripts\run_night.ps1
-# Le journal est écrit dans backend\benchmark_night.log. Résultats finaux : backend\benchmark\.
+# La sortie s'affiche en direct dans la fenêtre (barre de progression comprise) et est aussi écrite dans
+# backend\benchmark_night.log. Résultats finaux : backend\benchmark\.
 
-$ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
-$env:PYTHONIOENCODING = "utf-8"
 
 # Empêche la mise en veille tant que ce script tourne (aucun réglage de Windows n'est modifié durablement)
 Add-Type -Namespace Win -Name Power -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint flags);'
@@ -18,8 +17,9 @@ Add-Type -Namespace Win -Name Power -MemberDefinition '[DllImport("kernel32.dll"
 
 try {
     Write-Host "Début : $(Get-Date -Format 'dd/MM/yyyy HH:mm')"
-    & .\.venv\Scripts\python.exe scripts/run_benchmark.py --seeds 5 --heavy-seeds 4 2>&1 |
-        Tee-Object -FilePath benchmark_night.log
+    # Pas de tube ni de redirection : la sortie de Python va directement à la console (barre de progression en direct),
+    # et Python écrit lui-même le journal (--log).
+    & .\.venv\Scripts\python.exe scripts/run_benchmark.py --seeds 5 --heavy-seeds 4 --log benchmark_night.log
     Write-Host "Fin : $(Get-Date -Format 'dd/MM/yyyy HH:mm') (code de sortie Python : $LASTEXITCODE)"
 }
 finally {

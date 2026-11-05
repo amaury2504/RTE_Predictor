@@ -38,8 +38,15 @@ Les modèles ne sont comparés qu'à l'intérieur d'une même piste (les entrée
 | 3 | LightGBM | Arbres boostés |
 | 4 | MLP PyTorch (modèle actuel) | 5 graines |
 
-Avancement : un modèle à la fois, dans l'ordre ci-dessus. Un modèle est terminé quand il est évalué
-selon le protocole et que ses résultats figurent dans le tableau.
+Avancement : un modèle à la fois. Un modèle est terminé quand il est évalué selon le protocole et que
+ses résultats figurent dans le tableau.
+
+- [x] Base commune : variables d'entrée (`domain/features.py`), découpage (`domain/dataset.py`), KPI (`domain/kpi.py`),
+      contrat de modèle (`ports/regressor.py`), orchestration (`application/benchmark.py`), lancement
+      (`scripts/run_benchmark.py`).
+- [x] MLP PyTorch branché sur la base commune (normalisation apprise dans `fit`, sur l'entraînement seul).
+- [ ] Lancement complet du MLP (5 graines) et enregistrement des résultats dans `benchmark/`.
+- [ ] Prévision naïve (référence), Ridge, LightGBM.
 
 ## 5. Architecture (hexagonale, conservée)
 
@@ -76,7 +83,8 @@ Une seule commande relance les quatre modèles et produit un classement identiqu
 - Piste B et modèles de séquence (GRU, CNN 1D, TCN, PatchTST).
 - Modèles de fondation (Timestral, Chronos, TimesFM), zero-shot puis ajustés.
 - Page de classement dans le frontend.
-- Suivi d'expériences (MLflow), Docker, intégration continue.
+- Suivi d'expériences (MLflow), intégration continue.
+- Déploiement d'une démo en ligne et conteneurisation (voir section 10).
 
 ## 9. Points ouverts
 
@@ -84,3 +92,31 @@ Une seule commande relance les quatre modèles et produit un classement identiqu
 - Réentraîner le modèle avec la normalisation corrigée et noter le score de référence.
 - Ajouter LightGBM aux dépendances du projet.
 - Décider si les variantes de réseaux de neurones comptent comme des modèles distincts dans le classement.
+
+## 10. Déploiement d'une démo en ligne (à planifier)
+
+Objectif : qu'un visiteur puisse essayer l'application sans rien installer. Le profil invité
+(`POST /auth/guest`) permet déjà d'entrer sans compte.
+
+Pistes :
+- Frontend statique chez un hébergeur de sites (Vercel, Netlify, Cloudflare Pages, GitHub Pages).
+- Backend sur un hébergeur d'applications (Render, Railway, Fly.io, Space Hugging Face en Docker).
+- `docker-compose.yml` pour tout lancer en une commande en local.
+- README : lien de la démo en haut, captures d'écran ou GIF en secours.
+
+Points bloquants identifiés :
+- L'adresse du backend est écrite en dur dans le frontend (`http://localhost:8000`) et l'origine
+  autorisée par CORS l'est dans le backend (`http://localhost:5173`) : à passer en variables d'environnement.
+- Les fichiers du modèle (`data/model.pth`, `scaler_X.pkl`, `scaler_Y.pkl`) sont ignorés par git :
+  prévoir comment les fournir au serveur (fichier versionné à part, release GitHub ou étape de construction).
+- La base SQLite est réinitialisée au redémarrage sur la plupart des offres gratuites :
+  volume persistant ou base hébergée si les comptes doivent survivre.
+- PyTorch est lourd par rapport aux offres gratuites (mémoire limitée, à vérifier) :
+  version CPU seule ou export du modèle en ONNX.
+- Le profil invité ouvre les routes à toute personne qui joint le backend : ajouter une limitation
+  du nombre de requêtes avant une exposition publique.
+- Démarrage à froid sur les offres gratuites : le signaler dans le README.
+- Les secrets (`.env`, clé de signature des jetons) restent hors de git et se configurent chez l'hébergeur.
+
+Ordre prévu : variables d'environnement, puis Dockerfile et docker-compose, puis guide dans le README,
+puis déploiement (les comptes chez l'hébergeur sont à créer par le propriétaire du projet).

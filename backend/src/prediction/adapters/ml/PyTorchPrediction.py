@@ -1,9 +1,9 @@
 from src.prediction.domain.models_prediction import PredictionInput, ModelMetrics, PredictionResult
 from src.prediction.ports.predict import PredictionModelPort, EvaluateModelPort
+from src.prediction.domain.features import build_features
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import torch
-import holidays
 import pandas as pd
 import torch.nn as nn
 import numpy as np
@@ -41,8 +41,6 @@ class PredictWithPytorch(PredictionModelPort):
         self.scaler_Y = scaler_Y
 
     def predict_item(self, input: PredictionInput) -> PredictionResult:
-        fr_holidays = holidays.France()
-
         # Conversion heure locale Paris → UTC (les données d'entraînement sont en UTC)
         local_date = pd.to_datetime(input.date, format="%d/%m/%Y")
         local_dt = datetime(
@@ -50,37 +48,22 @@ class PredictWithPytorch(PredictionModelPort):
             int(input.hour), 0, 0, tzinfo=PARIS_TZ
         )
         utc_dt = local_dt.astimezone(timezone.utc)
-        utc_ts = pd.Timestamp(utc_dt)
 
-        features = {}
-
-        # Encodage cyclique de l'heure en UTC
-        features["hour_sin"] = np.sin(2 * np.pi * utc_dt.hour / 24)
-        features["hour_cos"] = np.cos(2 * np.pi * utc_dt.hour / 24)
-
-        # Températures + Températures^2
+        # Données brutes au même format que le jeu d'entraînement (jour et heure UTC, météo par région)
+        raw = {"date": utc_dt.strftime("%d/%m/%Y"), "hour": utc_dt.hour}
         for region, temp in input.temp_regions.items():
-            features[f"temperature_{region}"] = temp
-            features[f"temperature_{region}_squared"] = temp ** 2
-
-        # Vents
+            raw[f"temperature_{region}"] = temp
         for region, wind_speed in input.wind_regions.items():
-            features[f"wind_speed_{region}"] = wind_speed
-
-        # Humidity
+            raw[f"wind_speed_{region}"] = wind_speed
         for region, humidity in input.humidity_regions.items():
-            features[f"humidity_{region}"] = humidity
-
-        # Features temporelles en UTC
-        features["month"] = utc_ts.month
-        features["dayofweek"] = utc_ts.dayofweek
-        features["is_holiday"] = 1 if utc_ts in fr_holidays else 0
+            raw[f"humidity_{region}"] = humidity
 
         date_originale = input.date
         hour_originale = input.hour
 
-        df = pd.DataFrame([features])
-        df = df[self.scaler_X.feature_names_in_]
+        # Variables d'entrée construites par le code commun (entraînement, benchmark, API)
+        features = build_features(pd.DataFrame([raw]))
+        df = features[self.scaler_X.feature_names_in_]
 
         input_normalized = self.scaler_X.transform(df)
 

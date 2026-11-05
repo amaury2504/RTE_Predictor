@@ -1,40 +1,26 @@
+import sys
+sys.path.insert(0, ".")  # exécution depuis backend/
+
 import time
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import torch
 import torch.nn as nn
-import holidays
-from torch.utils.data import TensorDataset, DataLoader
 import joblib
+
+from src.prediction.domain.features import build_features
 
 torch.manual_seed(42)
 
 # Import de la base de données pour le ML
 df=pd.read_csv("data/dataset_ml.csv")
 
-# Retrouver les features du mois et des jours de la semaine
 dt=pd.to_datetime(df["date"], format="%d/%m/%Y")
 
-df["month"]=dt.dt.month
-df["dayofweek"]=dt.dt.dayofweek
-
-# Ajout de features
-fr_holidays=holidays.France()
-df["is_holiday"]=dt.apply(lambda x:1 if x in fr_holidays else 0)
-
-# Encodage cyclique de l'heure (remplace le raw hour)
-df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
-df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)
-df = df.drop(columns=["hour"])
-
-# Pour chaque colonne de température, créer son carré
-for col in df.columns:
-    if col.startswith("temperature_"):
-        df[col + "_squared"] = df[col] ** 2
-
-# Création de l'array des features
-X=df.drop(columns=["date","consommation"])
+# Création des features avec le code commun (calendrier, heure cyclique, carrés de température),
+# identique à celui du benchmark et de l'API
+X=build_features(df)
 
 # Création de l'array de la target
 Y=df["consommation"]

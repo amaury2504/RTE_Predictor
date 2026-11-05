@@ -39,18 +39,24 @@ X=df.drop(columns=["date","consommation"])
 # Création de l'array de la target
 Y=df["consommation"]
 
-scaler_X=MinMaxScaler()
-scaler_Y=MinMaxScaler()
-
-X_scaled=scaler_X.fit_transform(X)
-Y_scaled=scaler_Y.fit_transform(Y.values.reshape(-1,1))
-
 # Création des sous-ensembles
 
 # Indices de chaque période
 train_mask = dt.dt.year <= 2021
 val_mask = dt.dt.year == 2022
 test_mask = dt.dt.year >= 2023
+
+# Normalisation : les échelles (min/max) sont apprises sur l'ENTRAÎNEMENT SEUL,
+# puis appliquées à tout. Les ajuster sur toutes les données ferait fuiter de
+# l'information du jeu de test (data leakage).
+scaler_X=MinMaxScaler()
+scaler_Y=MinMaxScaler()
+
+scaler_X.fit(X[train_mask])
+scaler_Y.fit(Y[train_mask].values.reshape(-1,1))
+
+X_scaled=scaler_X.transform(X)
+Y_scaled=scaler_Y.transform(Y.values.reshape(-1,1))
 
 # Split X
 X_train = X_scaled[train_mask]

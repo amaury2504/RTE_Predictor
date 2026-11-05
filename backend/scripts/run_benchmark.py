@@ -65,12 +65,12 @@ def pm(row, kpi, digits=2, show_std=True):
 
 def overall_table(summary: list[dict]) -> str:
     lines = [
-        "| Rang | Modèle | Années | Exécutions | MAE (GW) | RMSE (GW) | MAPE (%) | Biais (GW) | MASE | Entraînement (s) |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| Rang | Modèle | Années | Exécutions | MAE (GW) | MAE centrée (GW) | RMSE (GW) | MAPE (%) | Biais (GW) | MASE | Entraînement (s) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for rank, row in enumerate(summary, start=1):
         lines.append(
-            f"| {rank} | {row['model']} | {row['folds']} | {row['runs']} | {pm(row, 'mae')} | {pm(row, 'rmse')} "
+            f"| {rank} | {row['model']} | {row['folds']} | {row['runs']} | {pm(row, 'mae')} | {pm(row, 'mae_debiased')} | {pm(row, 'rmse')} "
             f"| {pm(row, 'mape')} | {pm(row, 'bias')} | {pm(row, 'mase')} | {fmt(row['fit_seconds'], 1)} |"
         )
     return "\n".join(lines)
@@ -78,12 +78,12 @@ def overall_table(summary: list[dict]) -> str:
 
 def fold_table(by_fold: list[dict]) -> str:
     lines = [
-        "| Année de test | Modèle | Exécutions | MAE (GW) | RMSE (GW) | MAPE (%) | Biais (GW) | MASE | MAE validation (GW) |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| Année de test | Modèle | Exécutions | MAE (GW) | MAE centrée (GW) | RMSE (GW) | MAPE (%) | Biais (GW) | MASE | MAE validation (GW) |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for row in by_fold:
         lines.append(
-            f"| {row['test_year']} | {row['model']} | {row['runs']} | {pm(row, 'mae')} | {pm(row, 'rmse')} "
+            f"| {row['test_year']} | {row['model']} | {row['runs']} | {pm(row, 'mae')} | {pm(row, 'mae_debiased')} | {pm(row, 'rmse')} "
             f"| {pm(row, 'mape')} | {pm(row, 'bias')} | {pm(row, 'mase')} | {fmt(row['val_mae'])} |"
         )
     return "\n".join(lines)
@@ -100,6 +100,8 @@ def main():
                         help="ne pas réentraîner sur entraînement + validation après le réglage")
     parser.add_argument("--half-life", type=float, default=3.0,
                         help="demi-vie (années) de la pondération des variantes _recent")
+    parser.add_argument("--bias-window", type=int, default=28,
+                        help="fenêtre (jours) de la correction du biais récent ; 0 = pas de variante _corr")
     parser.add_argument("--no-baselines", action="store_true",
                         help="ne pas ajouter les références (prévisions naïves et prévisions RTE)")
     parser.add_argument("--data", default="data/dataset_ml.csv")
@@ -120,6 +122,7 @@ def main():
     results = run_walk_forward(
         {n: registry[n] for n in names}, full, args.test_years, seeds,
         on_progress=lambda message: print(f"[run ] {message}", flush=True),
+        bias_window_days=args.bias_window or None,
     )
     if not args.no_baselines:
         results += run_baselines(full, load_reference_forecasts(args.data), args.test_years)
@@ -137,6 +140,7 @@ def main():
             "max_epochs": args.max_epochs,
             "patience": args.patience,
             "refit_on_train_and_val": not args.no_refit,
+            "bias_correction": {"window_days": args.bias_window, "delay_days": 2, "min_days": 7},
             "recency_half_life_years": args.half_life,
         },
         "summary": summary,

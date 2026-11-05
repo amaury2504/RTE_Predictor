@@ -72,6 +72,10 @@ class KpiReport:
     weekday: SegmentKpi | None = None
     weekend: SegmentKpi | None = None
 
+    # MAE une fois le biais moyen retiré (mean |erreur - biais|) : mesure la qualité de la forme de la
+    # courbe indépendamment d'un décalage de niveau (voir DECISIONS.md)
+    mae_debiased: float | None = None
+
 
 def _clean(value: float | None, digits: int = 4) -> float | None:
     """Arrondit et convertit NaN/inf en None (JSON-safe)."""
@@ -215,4 +219,5 @@ def compute_kpis(
         by_day=by_day,
         weekday=weekday,
         weekend=weekend,
+        mae_debiased=_clean(np.mean(np.abs(err - np.mean(err)))),
     )

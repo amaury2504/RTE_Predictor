@@ -270,3 +270,20 @@ def test_les_kpi_de_validation_utilisent_les_predictions_d_avant_reentrainement(
     result = evaluate_regressor(WeightRecorder(), split_for_test_year(make_full(), 2023))
     assert result.val.mae == pytest.approx(0.0)   # val_predictions_ parfaites
     assert result.test.mae > 0                    # le test, lui, est prédit par predict()
+
+
+def test_bias_correction_adds_a_corr_row_and_removes_a_constant_offset():
+    class Overestimator(MeanRegressor):
+        name = "surestime"
+        def predict(self, X):
+            return np.full(len(X), 60.0)       # très au-dessus de la série (autour de 50)
+
+    full = make_full(first_year=2020, last_year=2024, rows_per_year=24 * 30)
+    data = split_for_test_year(full, 2024)
+    plain = run_benchmark({"surestime": lambda seed: Overestimator()}, data, [0])
+    corrected = run_benchmark({"surestime": lambda seed: Overestimator()}, data, [0], bias_window_days=7)
+    assert [r.model for r in plain] == ["surestime"]
+    assert [r.model for r in corrected] == ["surestime", "surestime_corr"]
+    assert corrected[1].test.mae < corrected[0].test.mae
+    assert abs(corrected[1].test.bias) < abs(corrected[0].test.bias)
+    assert corrected[0].test.mae_debiased is not None

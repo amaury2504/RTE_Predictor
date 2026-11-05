@@ -7,17 +7,20 @@ Protocole (voir CDC.md) :
 - les modèles à aléa sont répétés avec plusieurs graines, les autres une seule fois.
 """
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from statistics import mean, pstdev
 from typing import Callable
 
+import numpy as np
+
+from src.prediction.domain.bias_correction import rolling_bias_correction
 from src.prediction.domain.dataset import BenchmarkDataset, FullDataset, split_for_test_year
 from src.prediction.domain.kpi import KpiReport, compute_kpis
 from src.prediction.domain.recency import recency_weights
 from src.prediction.ports.regressor import RegressorPort
 
 # Indicateurs agrégés dans les tableaux de résultats (tous lus sur le jeu de test)
-SUMMARY_KPIS = ("mae", "rmse", "mape", "wape", "bias", "p95_ae", "r2", "mase")
+SUMMARY_KPIS = ("mae", "rmse", "mape", "wape", "bias", "p95_ae", "r2", "mase", "mae_debiased")
 
 
 @dataclass(frozen=True)
@@ -29,12 +32,19 @@ class RunResult:
     val: KpiReport
     test: KpiReport
     test_year: int | None = None
+    # KPI de test après correction du biais récent (None si la correction n'est pas demandée)
+    test_corrected: KpiReport | None = None
 
 
 def evaluate_regressor(
     regressor: RegressorPort, data: BenchmarkDataset, seed: int | None = None, test_year: int | None = None,
+    bias_window_days: int | None = None,
 ) -> RunResult:
-    """Entraîne un modèle puis calcule ses KPI sur la validation et sur le test."""
+    """Entraîne un modèle puis calcule ses KPI sur la validation et sur le test.
+
+    Si `bias_window_days` est donné, calcule aussi les KPI du test après correction du biais récent :
+    les erreurs des jours déjà écoulés du test (avec un décalage de 2 jours) corrigent les jours suivants.
+    """
     # Pondération des années récentes, si le modèle en veut : âge mesuré depuis le début de l'année de test
     w_train = w_val = None
     if regressor.recency_half_life_years:
@@ -56,6 +66,11 @@ def evaluate_regressor(
     test_pred = regressor.predict(data.test.X)
     predict_seconds = time.perf_counter() - t0
 
+    test_corrected = None
+    if bias_window_days:
+        correction = rolling_bias_correction(data.test.timestamps, test_pred, data.test.y, bias_window_days)
+        test_corrected = compute_kpis(data.test.timestamps, np.asarray(test_pred) + correction, data.test.y)
+
     return RunResult(
         model=regressor.name,
         seed=seed,
@@ -64,6 +79,7 @@ def evaluate_regressor(
         val=compute_kpis(data.val.timestamps, val_pred, data.val.y),
         test=compute_kpis(data.test.timestamps, test_pred, data.test.y),
         test_year=test_year,
+        test_corrected=test_corrected,
     )
 
 
@@ -73,8 +89,12 @@ def run_benchmark(
     seeds: list[int],
     on_progress: Callable[[str], None] = lambda message: None,
     test_year: int | None = None,
+    bias_window_days: int | None = None,
 ) -> list[RunResult]:
-    """Exécute chaque modèle sur un découpage : une fois par graine s'il est stochastique, une fois sinon."""
+    """Exécute chaque modèle sur un découpage : une fois par graine s'il est stochastique, une fois sinon.
+
+    Avec `bias_window_days`, chaque modèle produit une ligne de plus, « <nom>_corr », avec le biais récent corrigé.
+    """
     results: list[RunResult] = []
     for name, factory in factories.items():
         for i, seed in enumerate(seeds):
@@ -82,7 +102,12 @@ def run_benchmark(
             if i > 0 and not regressor.stochastic:
                 break
             on_progress(f"{name} (graine {seed})")
-            results.append(evaluate_regressor(regressor, data, seed if regressor.stochastic else None, test_year))
+            result = evaluate_regressor(
+                regressor, data, seed if regressor.stochastic else None, test_year, bias_window_days)
+            results.append(result)
+            if result.test_corrected is not None:
+                results.append(replace(
+                    result, model=f"{result.model}_corr", test=result.test_corrected, test_corrected=None))
     return results
 
 
@@ -92,6 +117,7 @@ def run_walk_forward(
     test_years: list[int],
     seeds: list[int],
     on_progress: Callable[[str], None] = lambda message: None,
+    bias_window_days: int | None = None,
 ) -> list[RunResult]:
     """Évaluation glissante : refait tout le protocole pour chaque année de test."""
     results: list[RunResult] = []
@@ -101,6 +127,7 @@ def run_walk_forward(
             factories, data, seeds,
             on_progress=lambda message, year=year: on_progress(f"test {year} · {message}"),
             test_year=year,
+            bias_window_days=bias_window_days,
         )
     return results
 

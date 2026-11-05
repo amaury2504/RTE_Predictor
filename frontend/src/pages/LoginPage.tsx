@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { login, register } from "../services/api"
 import { useAuth } from "../context/AuthContext"
+import LogoMark from "../components/LogoMark"
 
 export default function LoginPage() {
     const [mode, setMode] = useState<"login" | "register">("login")
@@ -35,34 +36,34 @@ export default function LoginPage() {
         }
     }
 
+    const inputClass =
+        "w-full rounded-lg border border-line bg-raised px-4 py-2.5 text-sm text-ink placeholder-faint transition-colors focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon"
+
+    const tabClass = (active: boolean) =>
+        `flex-1 rounded-md py-2 text-sm font-medium transition-all ${
+            active ? "bg-surface text-neon-soft shadow-glow" : "text-muted hover:text-ink"
+        }`
+
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="flex min-h-screen items-center justify-center px-4">
             <div className="w-full max-w-md">
-                <div className="text-center mb-8">
-                    <span className="text-4xl">⚡</span>
-                    <h1 className="text-2xl font-bold text-gray-900 mt-2">RTE Predictor</h1>
-                    <p className="text-gray-500 text-sm mt-1">Prédiction de consommation électrique</p>
+                <div className="mb-8 flex flex-col items-center text-center">
+                    <LogoMark size={44} />
+                    <h1 className="mt-4 text-2xl font-semibold tracking-tight text-ink">RTE Predictor</h1>
+                    <p className="mt-1 text-sm text-muted">Prédiction de consommation électrique</p>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                    <div className="flex rounded-lg bg-gray-100 p-1 mb-6">
+                <div className="rounded-xl border border-line bg-surface p-8 shadow-card">
+                    <div className="mb-6 flex rounded-lg border border-line bg-canvas p-1">
                         <button
                             onClick={() => { setMode("login"); setError(null) }}
-                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                                mode === "login"
-                                    ? "bg-white text-gray-900 shadow-sm"
-                                    : "text-gray-500 hover:text-gray-700"
-                            }`}
+                            className={tabClass(mode === "login")}
                         >
                             Connexion
                         </button>
                         <button
                             onClick={() => { setMode("register"); setError(null) }}
-                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                                mode === "register"
-                                    ? "bg-white text-gray-900 shadow-sm"
-                                    : "text-gray-500 hover:text-gray-700"
-                            }`}
+                            className={tabClass(mode === "register")}
                         >
                             Inscription
                         </button>
@@ -70,7 +71,7 @@ export default function LoginPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="mb-1.5 block text-sm font-medium text-muted">
                                 Adresse email
                             </label>
                             <input
@@ -79,12 +80,12 @@ export default function LoginPage() {
                                 value={mail}
                                 onChange={e => setMail(e.target.value)}
                                 placeholder="vous@exemple.fr"
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                className={inputClass}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="mb-1.5 block text-sm font-medium text-muted">
                                 Mot de passe
                             </label>
                             <input
@@ -93,18 +94,18 @@ export default function LoginPage() {
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 placeholder="••••••••"
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                className={inputClass}
                             />
                         </div>
 
                         {error && (
-                            <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg px-4 py-3">
+                            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                                 {error}
                             </div>
                         )}
 
                         {mode === "register" && !error && (
-                            <div className="bg-green-50 border border-green-100 text-green-700 text-sm rounded-lg px-4 py-3">
+                            <div className="rounded-lg border border-neon/30 bg-neon/10 px-4 py-3 text-sm text-neon-soft">
                                 Après inscription, connectez-vous avec vos identifiants.
                             </div>
                         )}
@@ -112,7 +113,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+                            className="w-full rounded-lg bg-neon py-2.5 text-sm font-semibold text-canvas shadow-glow transition-colors hover:bg-neon-soft disabled:opacity-40 disabled:shadow-none"
                         >
                             {loading
                                 ? "Chargement..."

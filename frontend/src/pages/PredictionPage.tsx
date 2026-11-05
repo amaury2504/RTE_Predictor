@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { predict, fetchCurrentWeather, fetchRTENow } from "../services/api"
 import { useAuth } from "../context/AuthContext"
 import ResultBanner from "../components/ResultBanner"
+import Navbar from "../components/Navbar"
 import { REGIONS } from "../types/api"
 import type { RegionWeather, PredictionResponse } from "../types/api"
 
@@ -17,13 +18,13 @@ function SliderField({
 }) {
     return (
         <div className="flex items-center gap-4">
-            <span className="w-32 text-sm text-gray-600 shrink-0">{label}</span>
+            <span className="w-32 shrink-0 text-sm text-muted">{label}</span>
             <input
                 type="range" min={min} max={max} value={value}
                 onChange={e => onChange(Number(e.target.value))}
-                className="flex-1 accent-blue-600"
+                className="flex-1"
             />
-            <span className="w-20 text-sm font-medium text-gray-800 text-right shrink-0">
+            <span className="w-20 shrink-0 text-right text-sm font-medium text-ink tabular-nums">
                 {value} {unit}
             </span>
         </div>
@@ -135,73 +136,71 @@ export default function PredictionPage() {
     const handleLogout = () => { logout(); navigate("/login") }
     const isAnyLoading = loading || loadingNow
 
+    const cardClass = "rounded-xl border border-line bg-surface shadow-card"
+
     return (
-        <div className={`min-h-screen bg-gray-50 ${result ? "pb-28" : ""}`}>
-            <nav className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-40">
-                <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="text-xl">⚡</span>
-                        <span className="font-bold text-gray-900">RTE Predictor</span>
-                    </div>
-                    <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
+        <div className={`min-h-screen ${result ? "pb-28" : ""}`}>
+            <Navbar
+                right={
+                    <button onClick={handleLogout} className="transition-colors hover:text-ink">
                         Déconnexion
                     </button>
-                </div>
-            </nav>
+                }
+            />
 
-            <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+            <main className="mx-auto max-w-4xl space-y-6 px-6 py-8">
 
                 {/* Bouton "Maintenant" */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-6">
-                    <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="rounded-xl border border-neon/30 bg-gradient-to-r from-neon/10 to-transparent p-6 shadow-card">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
                         <div>
-                            <h2 className="text-base font-semibold text-gray-900">Prédiction en temps réel</h2>
-                            <p className="text-sm text-gray-500 mt-0.5">
+                            <h2 className="text-base font-semibold text-ink">Prédiction en temps réel</h2>
+                            <p className="mt-0.5 text-sm text-muted">
                                 Météo actuelle auto-remplie · Comparaison avec la consommation RTE
                             </p>
                         </div>
                         <button
                             onClick={handleNow}
                             disabled={isAnyLoading}
-                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors text-sm shadow-sm whitespace-nowrap"
+                            className="whitespace-nowrap rounded-lg bg-neon px-6 py-2.5 text-sm font-semibold text-canvas shadow-glow transition-colors hover:bg-neon-soft disabled:opacity-40 disabled:shadow-none"
                         >
-                            {loadingNow ? loadingStep || "Chargement..." : "⚡ Prédire maintenant"}
+                            {loadingNow ? loadingStep || "Chargement..." : "Prédire maintenant"}
                         </button>
                     </div>
                 </div>
 
                 {/* Date et heure */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Date et heure</h2>
-                    <div className="flex flex-col sm:flex-row gap-4">
+                <div className={`${cardClass} p-6`}>
+                    <h2 className="mb-4 text-lg font-semibold text-ink">Date et heure</h2>
+                    <div className="flex flex-col gap-4 sm:flex-row">
                         <div className="flex-1">
-                            <label className="block text-sm text-gray-600 mb-1">Date</label>
+                            <label className="mb-1.5 block text-sm text-muted">Date</label>
                             <input
                                 type="date" value={date}
                                 onChange={e => setDate(e.target.value)}
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                className="w-full rounded-lg border border-line bg-raised px-4 py-2.5 text-sm text-ink transition-colors focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon"
                             />
                         </div>
                         <div className="flex-1">
-                            <label className="block text-sm text-gray-600 mb-1">
-                                Heure — {String(hour).padStart(2, "0")}h00
+                            <label className="mb-1.5 block text-sm text-muted">
+                                Heure — <span className="text-ink tabular-nums">{String(hour).padStart(2, "0")}h00</span>
                             </label>
                             <input
                                 type="range" min={0} max={23} value={hour}
                                 onChange={e => setHour(Number(e.target.value))}
-                                className="w-full mt-2 accent-blue-600"
+                                className="mt-2 w-full"
                             />
                         </div>
                     </div>
                 </div>
 
                 {/* Accordéon régions */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100">
-                        <h2 className="text-lg font-semibold text-gray-900">Météo par région</h2>
-                        <p className="text-sm text-gray-400 mt-0.5">Cliquez sur une région pour ajuster ses paramètres</p>
+                <div className={`${cardClass} overflow-hidden`}>
+                    <div className="border-b border-line px-6 py-4">
+                        <h2 className="text-lg font-semibold text-ink">Météo par région</h2>
+                        <p className="mt-0.5 text-sm text-faint">Cliquez sur une région pour ajuster ses paramètres</p>
                     </div>
-                    <div className="divide-y divide-gray-50">
+                    <div className="divide-y divide-line">
                         {REGIONS.map(region => {
                             const isOpen = openRegion === region
                             const w = weather[region]
@@ -209,18 +208,23 @@ export default function PredictionPage() {
                                 <div key={region}>
                                     <button
                                         onClick={() => setOpenRegion(isOpen ? null : region)}
-                                        className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors text-left"
+                                        className="flex w-full items-center justify-between px-6 py-4 text-left transition-colors hover:bg-raised"
                                     >
-                                        <span className="text-gray-800 font-medium text-sm">{region}</span>
-                                        <div className="flex items-center gap-4 text-xs text-gray-400">
+                                        <span className="text-sm font-medium text-ink">{region}</span>
+                                        <div className="flex items-center gap-4 text-xs text-muted tabular-nums">
                                             <span>{w.temperature}°C</span>
                                             <span>{w.wind_speed} km/h</span>
                                             <span>{w.humidity}%</span>
-                                            <span className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}>▼</span>
+                                            <svg
+                                                width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+                                                className={`text-faint transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                                            >
+                                                <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
                                         </div>
                                     </button>
                                     {isOpen && (
-                                        <div className="px-6 pb-5 pt-1 space-y-4 bg-gray-50 border-t border-gray-100">
+                                        <div className="space-y-4 border-t border-line bg-canvas/50 px-6 pb-5 pt-4">
                                             <SliderField label="Température" unit="°C" min={-20} max={45}
                                                 value={w.temperature} onChange={v => updateWeather(region, "temperature", v)} />
                                             <SliderField label="Vent" unit="km/h" min={0} max={150}
@@ -236,7 +240,7 @@ export default function PredictionPage() {
                 </div>
 
                 {error && (
-                    <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg px-4 py-3">
+                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                         {error}
                     </div>
                 )}
@@ -244,15 +248,15 @@ export default function PredictionPage() {
                 <button
                     onClick={() => navigate("/performance")}
                     disabled={isAnyLoading}
-                    className="w-full bg-white hover:bg-gray-50 disabled:opacity-50 border border-gray-200 text-gray-700 font-semibold py-3 rounded-xl transition-colors text-sm shadow-sm"
+                    className="w-full rounded-lg border border-line bg-surface py-3 text-sm font-semibold text-ink transition-colors hover:border-neon/50 hover:text-neon-soft disabled:opacity-50"
                 >
-                    📊 Robustesse du modèle — 7 jours
+                    Robustesse du modèle sur 7 jours
                 </button>
 
                 <button
                     onClick={handlePredict}
                     disabled={isAnyLoading}
-                    className="w-full bg-gray-800 hover:bg-gray-900 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl transition-colors text-sm shadow-sm"
+                    className="w-full rounded-lg border border-neon/50 bg-transparent py-3 text-sm font-semibold text-neon-soft transition-colors hover:bg-neon/10 disabled:opacity-40"
                 >
                     {loading ? "Calcul en cours..." : "Lancer la prédiction manuellement"}
                 </button>

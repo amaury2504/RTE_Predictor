@@ -1,4 +1,4 @@
-import type { PredictionRequest, PredictionResponse, RegionWeather } from "../types/api"
+import type { PredictionRequest, PredictionResponse, RegionWeather, KpiPoint, KpiReport } from "../types/api"
 import { REGIONS, REGION_COORDS } from "../types/api"
 
 const BASE_URL = "http://localhost:8000"
@@ -142,7 +142,23 @@ export const batchPredict = async (items: BatchItem[], token: string): Promise<P
     return data.items
 }
 
-export const fetchRTEWeek = async (token: string): Promise<Record<string, number>> => {
+export const fetchKpis = async (points: KpiPoint[], token: string): Promise<KpiReport> => {
+    const res = await fetch(`${BASE_URL}/prediction/kpis`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ points }),
+    })
+    if (!res.ok) {
+        const err = await res.json()
+        throw new Error(typeof err.detail === "string" ? err.detail : "Erreur de calcul des KPI")
+    }
+    return await res.json()
+}
+
+export const fetchRTEWeek =async (token: string): Promise<Record<string, number>> => {
     const res = await fetch(`${BASE_URL}/prediction/rte-week`, {
         headers: { "Authorization": `Bearer ${token}` }
     })

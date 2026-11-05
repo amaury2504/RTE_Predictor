@@ -44,6 +44,48 @@ export interface PredictionResponse{
 }
 
 
+export interface SegmentKpi {
+    key: string | number
+    n: number
+    mae: number
+    mape: number | null
+    bias: number
+}
+
+export interface KpiPoint {
+    datetime: string
+    predicted: number // GW
+    actual: number    // GW
+}
+
+export interface KpiReport {
+    n: number
+    mean_actual: number
+    mean_predicted: number
+    mae: number
+    rmse: number
+    mape: number | null
+    wape: number | null
+    smape: number | null
+    nrmse: number | null
+    bias: number
+    median_ae: number
+    p95_ae: number
+    max_ae: number
+    r2: number | null
+    mase: number | null
+    within_5_pct: number | null
+    within_10_pct: number | null
+    peak_days: number
+    peak_mae: number | null
+    peak_bias: number | null
+    peak_hour_mae: number | null
+    by_hour: SegmentKpi[]
+    by_day: SegmentKpi[]
+    weekday: SegmentKpi | null
+    weekend: SegmentKpi | null
+}
+
 export const REGIONS: string[]=["Île-de-France",
                     "Auvergne-Rhône-Alpes",
                     "Bourgogne-Franche-Comté",

@@ -5,6 +5,10 @@ from src.auth.ports.user_repository import UserRepository
 from src.auth.domain.exceptions import InvalidCredentialsError,UserAlreadyExistsError
 
 
+# Identité portée par le jeton d'un profil invité (démo : accès sans compte)
+GUEST_SUBJECT="guest"
+
+
 class RegisterUser():
     """Classe servant à créer le use_case d'enregistrement d'utilisateur.
     Dans l'ordre :
@@ -54,3 +58,17 @@ class LoginUser():
             else:
                 raise InvalidCredentialsError()
 
+
+class LoginGuest():
+    """Use case pour continuer sans compte (mode démo) :
+
+    Dans l'ordre :
+        - Aucun identifiant n'est demandé
+        - On crée un token au nom du profil invité (GUEST_SUBJECT), avec la même durée de validité
+    """
+
+    def __init__(self,token_provider:TokenProvider):
+        self.token_provider=token_provider
+
+    def execute(self)->str:
+        return self.token_provider.create_token(GUEST_SUBJECT)

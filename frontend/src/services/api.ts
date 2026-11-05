@@ -29,6 +29,16 @@ export const login = async (mail: string, password: string): Promise<string> => 
     return data.token
 }
 
+// Mode démo : obtient un token de profil invité, sans identifiant ni mot de passe
+export const loginAsGuest = async (): Promise<string> => {
+    const response = await fetch(`${BASE_URL}/auth/guest`, { method: "POST" })
+    if (!response.ok) {
+        throw new Error("Impossible de continuer en profil invité")
+    }
+    const data = await response.json()
+    return data.token
+}
+
 const DEFAULT_WEATHER: RegionWeather = { temperature: 10, wind_speed: 20, humidity: 70 }
 
 export const fetchCurrentWeather = async (): Promise<Record<string, RegionWeather>> => {

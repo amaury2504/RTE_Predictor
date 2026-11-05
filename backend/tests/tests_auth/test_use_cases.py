@@ -2,7 +2,7 @@ from src.auth.domain.models_auth import User
 from src.auth.ports.user_repository import UserRepository
 from src.auth.ports.password_hasher import PasswordHasher
 from src.auth.ports.token_provider import TokenProvider
-from src.auth.application.auth_use_cases import RegisterUser, LoginUser
+from src.auth.application.auth_use_cases import RegisterUser, LoginUser, LoginGuest, GUEST_SUBJECT
 from src.auth.domain.exceptions import UserAlreadyExistsError
 import pytest
 
@@ -75,3 +75,28 @@ def test_valid_login_creates_token():
     login=LoginUser(repository=fake_repository,password_hasher=fake_hasher,token_provider=fake_token_provider)
     resultat=login.execute(mail="veroniquelachaux@gmail.com",plain_password="thispasswordisnothashed")
     assert resultat=="okpourcreate_token"
+
+
+class RecordingTokenProvider(TokenProvider):
+    """Token provider bidon qui mémorise l'identité pour laquelle le token est créé"""
+    def __init__(self):
+        self.subjects=[]
+
+    def create_token(self, mail)->str:
+        self.subjects.append(mail)
+        return("token_pour_"+mail)
+
+    def verify_token(self, token_used)->str:
+        return("ok")
+
+
+def test_guest_login_creates_token_for_guest_profile():
+    provider=RecordingTokenProvider()
+    token=LoginGuest(provider).execute()
+    assert provider.subjects==[GUEST_SUBJECT]
+    assert token=="token_pour_"+GUEST_SUBJECT
+
+
+def test_guest_login_needs_no_user_in_repository():
+    # Aucun repository n'est fourni : le profil invité ne dépend d'aucun compte
+    assert LoginGuest(FakeTokenProvider()).execute()=="okpourcreate_token"

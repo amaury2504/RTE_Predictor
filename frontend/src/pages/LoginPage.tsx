@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { login, register } from "../services/api"
+import { login, register, loginAsGuest } from "../services/api"
 import { useAuth } from "../context/AuthContext"
 import LogoMark from "../components/LogoMark"
 
@@ -10,6 +10,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState("")
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
 
     const { setToken } = useAuth()
     const navigate = useNavigate()
@@ -43,6 +44,20 @@ export default function LoginPage() {
         `flex-1 rounded-md py-2 text-sm font-medium transition-all ${
             active ? "bg-surface text-neon-soft shadow-glow" : "text-muted hover:text-ink"
         }`
+
+    const handleGuest = async () => {
+        setError(null)
+        setLoading(true)
+        try {
+            const token = await loginAsGuest()
+            setToken(token)
+            navigate("/predict")
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Erreur inconnue")
+        } finally {
+            setLoading(false)
+        }
+    }
 
     return (
         <div className="flex min-h-screen items-center justify-center px-4">
@@ -89,13 +104,21 @@ export default function LoginPage() {
                                 Mot de passe
                             </label>
                             <input
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 required
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 placeholder="••••••••"
                                 className={inputClass}
                             />
+                            <label className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-xs text-muted transition-colors hover:text-ink">
+                                <input
+                                    type="checkbox"
+                                    checked={showPassword}
+                                    onChange={e => setShowPassword(e.target.checked)}
+                                />
+                                Afficher le mot de passe
+                            </label>
                         </div>
 
                         {error && (
@@ -123,6 +146,16 @@ export default function LoginPage() {
                         </button>
                     </form>
                 </div>
+
+                {/* Mode démo : accès sans compte */}
+                <button
+                    type="button"
+                    onClick={handleGuest}
+                    disabled={loading}
+                    className="mt-4 w-full rounded-lg border border-line bg-surface/60 py-2.5 text-sm text-muted transition-colors hover:border-neon/50 hover:text-neon-soft disabled:opacity-40"
+                >
+                    Continuer avec un profil invité
+                </button>
             </div>
         </div>
     )

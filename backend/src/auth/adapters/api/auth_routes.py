@@ -1,6 +1,6 @@
 from fastapi import APIRouter,HTTPException
 from pydantic import BaseModel
-from src.auth.application.auth_use_cases import RegisterUser,LoginUser
+from src.auth.application.auth_use_cases import RegisterUser,LoginUser,LoginGuest
 from src.auth.adapters.persistence.sqlalchemy_repository_auth import SQLAlchemyUserRepository
 from src.auth.adapters.security.bcrypt_hasher import BcryptHasher
 from src.auth.adapters.security.jwt_token_provider import JWTTokenProvider
@@ -70,4 +70,12 @@ def login_user(request:LoginRequest)->TokenResponse:
         return(TokenResponse(token=token))
     except InvalidCredentialsError:
         logger.warning("Tentative de login échouée : %s", request.mail)
-        raise HTTPException(status_code=401,detail="Identifiant ou mot de passe incorrect") 
+        raise HTTPException(status_code=401,detail="Identifiant ou mot de passe incorrect")
+
+@auth_router.post("/guest",response_model=TokenResponse)
+def login_guest()->TokenResponse:
+    """Mode démo : délivre un token de profil invité, sans identifiant ni mot de passe"""
+    use_case=LoginGuest(token_provider)
+    token=use_case.execute()
+    logger.info("Connexion en profil invité")
+    return(TokenResponse(token=token))

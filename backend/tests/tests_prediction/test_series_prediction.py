@@ -63,3 +63,20 @@ def test_timestral_reduit_la_fenetre_quand_l_historique_est_court():
 def test_timestral_refuse_si_l_historique_est_trop_court():
     with pytest.raises(ForecastUnavailable):
         PredictWithTimestral(FakeHistory(hours=200), lambda: FakeForecaster()).predict_item(request(date="09/06/2026"))
+
+
+def test_les_heures_apres_la_derniere_consommation_publiee_sont_prevues_par_les_deux_modeles():
+    # Historique publié jusqu'à 18 h UTC ; on demande 20 h, 21 h et 23 h Paris (18 h, 19 h, 21 h UTC : les deux dernières sont futures)
+    history = FakeHistory(end="2026-06-10 18:00")
+    inputs = [request(hour=20), request(hour=21), request(hour=23)]
+    holt = PredictWithHoltWinters(history).predict_items(inputs)
+    timestral = PredictWithTimestral(history, lambda: FakeForecaster()).predict_items(inputs)
+    assert [r.hour for r in holt] == [20, 21, 23] and all(np.isfinite(r.power) for r in holt)
+    assert [r.power for r in timestral] == [55.0] * 3
+
+
+def test_une_heure_manquante_dans_l_historique_ne_bloque_pas_les_previsions():
+    history = FakeHistory()
+    history.series = history.series.drop(history.series.index[700])        # un trou dans la série
+    result = PredictWithTimestral(history, lambda: FakeForecaster()).predict_item(request(hour=20))
+    assert result.power == 55.0

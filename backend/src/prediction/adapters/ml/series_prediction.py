@@ -27,12 +27,13 @@ class ForecastUnavailable(Exception):
 
 
 def _extend(history: pd.Series, last: pd.Timestamp) -> tuple[pd.DatetimeIndex, np.ndarray]:
-    """Historique prolongé d'une heure inconnue (NaN) jusqu'à `last`, pour que la grille couvre les heures à prévoir."""
-    index, values = history.index, history.to_numpy(dtype=float)
-    if last > index.max():
-        index = index.append(pd.DatetimeIndex([last]))
-        values = np.append(values, np.nan)
-    return index, values
+    """Historique sur une grille horaire complète, prolongée jusqu'à `last` par des heures inconnues (NaN).
+
+    Les heures à prévoir (au-delà de la dernière consommation publiée) doivent TOUTES être sur la grille : les
+    prévisions sont lues à ces horodatages. Les heures manquantes de l'historique deviennent aussi des NaN.
+    """
+    grid = pd.date_range(history.index.min(), max(history.index.max(), last), freq="h")
+    return grid, history.reindex(grid).to_numpy(dtype=float)
 
 
 def _results(inputs: list[PredictionInput], wanted: list[pd.Timestamp], forecast: pd.Series) -> list[PredictionResult]:

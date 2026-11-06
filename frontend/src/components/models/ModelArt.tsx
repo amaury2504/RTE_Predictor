@@ -255,7 +255,7 @@ const hwX = (t: number) => HW.x0 + t * (HW.x1 - HW.x0)
 const hwY = (v: number) => HW.bottom - ((v - 0.2) / 0.8) * (HW.bottom - HW.top)
 
 const HW_STRIPS = [
-    { label: "Moyenne", y: 142, f: (t: number) => (t - 0.5) * 0.7 },
+    { label: "Moyenne", y: 142, f: () => 0 },
     { label: "Tendance", y: 174, f: (t: number) => t - 0.5 },
     { label: "Saison", y: 206, f: (t: number) => hwSeason(t) * 0.5 },
 ]

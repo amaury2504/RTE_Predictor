@@ -29,6 +29,7 @@ class MLPRegressor(RegressorPort):
         refit_on_val: bool = True,
         recency_half_life_years: float | None = None,
         verbose: bool = False,
+        name: str | None = None,
     ):
         self.seed = seed
         self.max_epochs = max_epochs
@@ -39,7 +40,7 @@ class MLPRegressor(RegressorPort):
         self.refit_on_val = refit_on_val
         self.recency_half_life_years = recency_half_life_years
         self.verbose = verbose
-        self.name = "mlp_recent" if recency_half_life_years else "mlp"
+        self.name = name or ("mlp_recent" if recency_half_life_years else "mlp")
 
         self.scaler_X: MinMaxScaler | None = None
         self.scaler_Y: MinMaxScaler | None = None

@@ -35,9 +35,9 @@ from src.prediction.application.run_cache import RunCache, config_key, source_fi
 
 DEFAULT_TEST_YEARS = [2022, 2023, 2024]
 # Modèles longs à entraîner : lancés en premier et avec --heavy-seeds graines
-HEAVY_MODELS = ("mlp", "mlp_recent")
+HEAVY_MODELS = ("mlp", "mlp_recent", "mlp_niveau")
 # Piste B : ces modèles reçoivent en plus des variables de niveau récent de la consommation (domain/level.py)
-TRACK_B = ("ridge_niveau", "lightgbm_niveau")
+TRACK_B = ("ridge_niveau", "lightgbm_niveau", "mlp_niveau")
 
 
 def build_registry(max_epochs: int, patience: int, refit: bool, half_life: float) -> dict:
@@ -49,6 +49,8 @@ def build_registry(max_epochs: int, patience: int, refit: bool, half_life: float
         "mlp": lambda seed: MLPRegressor(seed=seed, max_epochs=max_epochs, patience=patience, refit_on_val=refit),
         "mlp_recent": lambda seed: MLPRegressor(
             seed=seed, max_epochs=max_epochs, patience=patience, refit_on_val=refit, recency_half_life_years=half_life),
+        "mlp_niveau": lambda seed: MLPRegressor(
+            seed=seed, max_epochs=max_epochs, patience=patience, refit_on_val=refit, name="mlp_niveau"),
         "ridge": lambda seed: RidgeRegressor(refit_on_val=refit),
         "ridge_recent": lambda seed: RidgeRegressor(refit_on_val=refit, recency_half_life_years=half_life),
         "ridge_niveau": lambda seed: RidgeRegressor(refit_on_val=refit, name="ridge_niveau"),

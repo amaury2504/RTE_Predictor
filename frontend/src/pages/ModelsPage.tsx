@@ -21,7 +21,7 @@ const MODELS: ModelInfo[] = [
         kind: "Réseau de neurones",
         Art: MlpArt,
         lines: [
-            "Extraction des caractéristiques...",
+            "Extraction des caractéristiques en combinant météo, heure et calendrier.",
             "Les poids s'ajustent à chaque itération pour réduire l'erreur",
             "C'est ce qu'on entend traditionnellement par réseaux de neurones",
         ],

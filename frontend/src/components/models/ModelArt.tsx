@@ -153,13 +153,16 @@ export function LightGbmArt({ reduce }: ArtProps) {
 
 const TS_BASE = 170
 const TS_PAST = [34, 52, 66, 58, 40, 30, 46, 64, 60]
-const TS_FUTURE = [38, 54, 68, 56, 40, 34, 48, 62, 52]
-const TS_BLOCK = { x: 142, y: 68, w: 76, h: 96 }   // centré sur 180, milieu de la vue
-// Passé et futur : 9 barres chacun, de même taille, placées symétriquement de part et d'autre du bloc
+const TS_FUTURE = [46, 62, 74, 50, 36, 44]
+// Passé : 9 barres ; futur : 6 barres (l'horizon à prévoir est plus court que l'historique lu).
+// Le bloc est décalé un peu à droite du centre de la vue (198 au lieu de 180) pour rester à égale distance des deux groupes,
+// qui ont chacun 40 de marge avec le bord.
 const TS_PITCH = 12
 const TS_BAR = 8
-const TS_PAST_X0 = 22                                                    // passé : 22 à 126, centre 74
-const TS_FUTURE_X0 = 360 - TS_PAST_X0 - ((TS_FUTURE.length - 1) * TS_PITCH + TS_BAR)   // futur : 234 à 338, centre 286 (symétrique du passé)
+const TS_GAP = 16                                                        // espace entre un groupe de barres et le bloc
+const TS_PAST_X0 = 40                                                    // passé : 40 à 144
+const TS_BLOCK = { x: TS_PAST_X0 + (TS_PAST.length - 1) * TS_PITCH + TS_BAR + TS_GAP, y: 68, w: 76, h: 96 }   // 160 à 236
+const TS_FUTURE_X0 = TS_BLOCK.x + TS_BLOCK.w + TS_GAP                    // futur : 252 à 320
 
 export function TimestralArt({ reduce }: ArtProps) {
     const root = useRef<SVGSVGElement>(null)
@@ -188,7 +191,8 @@ export function TimestralArt({ reduce }: ArtProps) {
             </g>
             <rect className="ts-block" x={TS_BLOCK.x} y={TS_BLOCK.y} width={TS_BLOCK.w} height={TS_BLOCK.h} rx={16}
                 fill={BLUE} fillOpacity={0.18} stroke={SOFT} strokeOpacity={0.7} strokeWidth={1.5} />
-            <text x={TS_BLOCK.x + TS_BLOCK.w / 2} y={TS_BLOCK.y + TS_BLOCK.h / 2 + 5} textAnchor="middle" fontSize={15} fontWeight={600} fill="#e8eef8">28M</text>
+            <text x={TS_BLOCK.x + TS_BLOCK.w / 2} y={TS_BLOCK.y + TS_BLOCK.h / 2 - 4} textAnchor="middle" fontSize={13} fontWeight={600} fill="#e8eef8">Timestral</text>
+            <text x={TS_BLOCK.x + TS_BLOCK.w / 2} y={TS_BLOCK.y + TS_BLOCK.h / 2 + 16} textAnchor="middle" fontSize={15} fontWeight={600} fill="#e8eef8">28M</text>
             <g className="ts-fade">
                 {TS_FUTURE.map((h, i) => (
                     <rect key={`f${i}`} className="ts-future" x={TS_FUTURE_X0 + i * TS_PITCH} y={TS_BASE - h * 1.4} width={TS_BAR} height={h * 1.4} rx={3}
@@ -198,7 +202,7 @@ export function TimestralArt({ reduce }: ArtProps) {
             <text x={TS_PAST_X0 + ((TS_PAST.length - 1) * TS_PITCH + TS_BAR) / 2} y={192} textAnchor="middle" fontSize={12} fill={DIM}>Passé</text>
             <text x={TS_FUTURE_X0 + ((TS_FUTURE.length - 1) * TS_PITCH + TS_BAR) / 2} y={192} textAnchor="middle" fontSize={12} fill={DIM}>Futur</text>
             {[0, 1, 2].map(i => (
-                <rect key={`w${i}`} x={162 + i * 14} y={190 - [10, 16, 12][i]} width={8} height={[10, 16, 12][i]} rx={2} fill={SOFT} fillOpacity={0.7} />
+                <rect key={`w${i}`} x={TS_BLOCK.x + TS_BLOCK.w / 2 - 18 + i * 14} y={190 - [10, 16, 12][i]} width={8} height={[10, 16, 12][i]} rx={2} fill={SOFT} fillOpacity={0.7} />
             ))}
             <text x={TS_BLOCK.x + TS_BLOCK.w / 2} y={214} textAnchor="middle" fontSize={12} fill={DIM}>Météo</text>
         </svg>
@@ -242,19 +246,18 @@ export function RidgeArt({ reduce }: ArtProps) {
     )
 }
 
-// --- Holt-Winters : moyenne, rythme de la journée et de la semaine, puis prolongement ---
+// --- Holt-Winters : moyenne, tendance et saison, puis prolongement ------------
 
 const HW = { x0: 20, x1: 340, top: 18, bottom: 112, cut: 0.68 }
-const hwWeek = (t: number) => Math.sin(t * Math.PI * 2 * 5)
-const hwDay = (t: number) => Math.sin(t * Math.PI * 2 * 20)
-const hwSignal = (t: number) => 0.5 + 0.12 * hwWeek(t) + 0.06 * hwDay(t)
+const hwSeason = (t: number) => Math.sin(t * Math.PI * 2 * 5)
+const hwSignal = (t: number) => 0.4 + 0.34 * t + 0.14 * hwSeason(t)
 const hwX = (t: number) => HW.x0 + t * (HW.x1 - HW.x0)
 const hwY = (v: number) => HW.bottom - ((v - 0.2) / 0.8) * (HW.bottom - HW.top)
 
 const HW_STRIPS = [
-    { label: "Moyenne", y: 142, f: () => 0 },
-    { label: "Journée", y: 174, f: (t: number) => hwDay(t) * 0.5 },
-    { label: "Semaine", y: 206, f: (t: number) => hwWeek(t) * 0.5 },
+    { label: "Moyenne", y: 142, f: (t: number) => (t - 0.5) * 0.7 },
+    { label: "Tendance", y: 174, f: (t: number) => t - 0.5 },
+    { label: "Saison", y: 206, f: (t: number) => hwSeason(t) * 0.5 },
 ]
 const HW_STRIP_X0 = 112
 
@@ -271,7 +274,7 @@ export function HoltWintersArt({ reduce }: ArtProps) {
 
     return (
         <svg ref={root} viewBox="0 0 360 224" className={svgClass} role="img"
-            aria-label="Holt-Winters : la consommation est décomposée en une moyenne, un rythme de la journée et un rythme de la semaine, puis ce rythme est prolongé vers l'avenir">
+            aria-label="Holt-Winters : la consommation est décomposée en moyenne, tendance et saison, puis son rythme est prolongé vers l'avenir">
             <g className="hw-fade">
                 <rect className="hw-band" x={hwX(HW.cut)} y={HW.top - 6} width={HW.x1 - hwX(HW.cut)} height={HW.bottom - HW.top + 12} rx={8} fill="#ffffff" fillOpacity={0.05} />
                 <path className="hw-past" pathLength={1} d={curve(t => hwY(hwSignal(t * HW.cut)), HW.x0, hwX(HW.cut), 70)}

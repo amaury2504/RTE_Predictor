@@ -65,7 +65,7 @@ const MODELS: ModelInfo[] = [
         kind: "Lissage exponentiel",
         Art: HoltWintersArt,
         lines: [
-            "On sépare les caractéristiques : moyenne, rythme de la journée et rythme de la semaine.",
+            "On sépare les caractéristiques : moyenne, tendance et saison.",
             "Chaque composante se met à jour avec les données les plus récentes.",
             "Sans météo : il prolonge le rythme des jours et des semaines.",
         ],

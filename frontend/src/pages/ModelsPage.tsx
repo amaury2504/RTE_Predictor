@@ -105,9 +105,10 @@ export default function ModelsPage() {
 
     return (
         <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
-            <header>
-                <h1 className="text-2xl font-semibold text-ink">Modèles</h1>
-                <p className="mt-1 text-sm text-[var(--text-2)]">Comment chaque modèle prédit, en trois lignes.</p>
+            <header className="mb-10 mt-4 max-w-3xl">
+                <h1 className="title-sheen text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+                    Explication des modèles
+                </h1>
             </header>
             {MODELS.map((m, i) => <ModelSection key={m.id} model={m} index={i} reduce={reduce} />)}
         </main>

@@ -9,8 +9,6 @@ interface ModelInfo {
     id: string
     name: string
     kind: string
-    /** Le meilleur modèle du benchmark : seul à porter l'orange. */
-    best?: boolean
     Art: ComponentType<{ reduce: boolean }>
     /** Exactement trois lignes : ce que fait le modèle, comment il apprend, ce qu'il faut en retenir. */
     lines: [string, string, string]
@@ -32,7 +30,6 @@ const MODELS: ModelInfo[] = [
         id: "lightgbm",
         name: "LightGBM",
         kind: "Arbres de décision en série",
-        best: true,
         Art: LightGbmArt,
         lines: [
             "Il empile des centaines de petits arbres de décision.",
@@ -59,7 +56,7 @@ const MODELS: ModelInfo[] = [
         lines: [
             "Une somme pondérée : chaque facteur reçoit un poids.",
             "Une pénalité empêche les poids de grossir et de sur-apprendre.",
-            "Simple et stable : le repère des modèles entraînés.",
+            "Simple et stable : il sert de repère aux modèles entraînés.",
         ],
     },
     {
@@ -68,7 +65,7 @@ const MODELS: ModelInfo[] = [
         kind: "Lissage exponentiel",
         Art: HoltWintersArt,
         lines: [
-            "Il sépare le niveau, la tendance et la saison.",
+            "On sépare les caractéristiques : niveau de base, rythme de la journée et de la semaine.",
             "Chaque composante se met à jour avec les données les plus récentes.",
             "Sans météo : il prolonge le rythme des jours et des semaines.",
         ],
@@ -89,12 +86,6 @@ function ModelSection({ model, index, reduce }: { model: ModelInfo; index: numbe
                 <div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <h2 id={`modele-${model.id}`} className="text-2xl font-semibold text-[var(--text-1)]">{model.name}</h2>
-                        {model.best && (
-                            <span className="rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                                style={{ color: "var(--series-predicted)", borderColor: "var(--series-predicted)" }}>
-                                Meilleur du benchmark
-                            </span>
-                        )}
                     </div>
                     <p className="mt-1 text-sm text-[var(--text-2)]">{model.kind}</p>
                     <div className="mt-5 space-y-3">

@@ -3,6 +3,7 @@ import { createTimeline, stagger } from "animejs"
 import { CHART } from "../../design/chartColors"
 import { easeOut } from "../../design/motion"
 import { useInViewLoop } from "../../hooks/useInViewLoop"
+import { gbCycleMs, gbStageState } from "./lightgbmTimeline"
 
 /*
  * Cinq illustrations animées, une par modèle. Règles communes :
@@ -111,21 +112,24 @@ export function LightGbmArt({ reduce }: ArtProps) {
     const root = useRef<SVGSVGElement>(null)
 
     useInViewLoop(root, q => {
-        const tl = createTimeline({ loop: true, loopDelay: 700, defaults: { ease: easeOut } })
-        GB_STAGES.forEach((_, i) => {
-            const at = i * 1250
-            const last = i === GB_STAGES.length - 1
-            tl.add(q(`.gb-s${i}`), { strokeDashoffset: [1, 0], opacity: [0, 1], duration: 700 }, at)
-                .add(q(`.gb-t${i}`), { opacity: [0, 1], duration: 250 }, at)
-            if (!last) {
-                tl.add(q(`.gb-s${i}`), { opacity: [1, 0], duration: 300 }, at + 1050)
-                    .add(q(`.gb-t${i}`), { opacity: [1, 0], duration: 250 }, at + 1050)
-            }
-        })
-        const end = (GB_STAGES.length - 1) * 1250 + 1500
-        return tl
-            .add(q(`.gb-s${GB_STAGES.length - 1}`), { opacity: [1, 0], duration: 450 }, end)
-            .add(q(`.gb-t${GB_STAGES.length - 1}`), { opacity: [1, 0], duration: 450 }, end)
+        const strokes = GB_STAGES.map((_, i) => q(`.gb-s${i}`)[0] as SVGPathElement | undefined)
+        const labels = GB_STAGES.map((_, i) => q(`.gb-t${i}`)[0])
+        const clock = { t: 0 }
+        const render = () => {
+            GB_STAGES.forEach((_, i) => {
+                const state = gbStageState(i, clock.t, GB_STAGES.length)
+                const stroke = strokes[i]
+                if (stroke) {
+                    stroke.style.strokeDashoffset = String(1 - state.draw)
+                    stroke.style.opacity = String(state.stroke)
+                }
+                const label = labels[i]
+                if (label) label.style.opacity = String(state.label)
+            })
+        }
+        render()
+        return createTimeline({ loop: true, loopDelay: 700, defaults: { ease: "linear" } })
+            .add(clock, { t: gbCycleMs(GB_STAGES.length), duration: gbCycleMs(GB_STAGES.length), onUpdate: render }, 0)
     }, reduce)
 
     return (

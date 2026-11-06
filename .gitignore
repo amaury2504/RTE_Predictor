@@ -43,9 +43,11 @@ dist/
 # Database :
 *.db
 
-# Fichier de consommation électrique 
-data/
+# Fichier de consommation électrique (dossier des données du backend uniquement : le frontend a un dossier components/data)
+/backend/data/
 
 # Sauvegarde des exécutions du benchmark (reprise après interruption) et journal de la nuit
 benchmark_cache/
 benchmark_night.log
+# Rapports Lighthouse (skill lighthouse)
+.lighthouse-reports/

@@ -1,11 +1,14 @@
 from dataclasses import asdict
 from fastapi import Depends, APIRouter, HTTPException
+from typing import Literal
 from pydantic import BaseModel, Field
 from src.prediction.adapters.ml.PyTorchPrediction import ConsumptionModel
 from src.auth.adapters.api.auth_routes import checker
 from src.prediction.domain.models_prediction import PredictionInput, PredictionResult
 from src.prediction.application.use_cases_prediction import PredictConsumptionUseCase, ComputeKpisUseCase
 from src.prediction.adapters.ml.PyTorchPrediction import PredictWithPytorch
+from src.prediction.adapters.ml.lightgbm_prediction import PredictWithLightGBM
+from src.prediction.ports.predict import PredictionModelPort
 from src.prediction.adapters.datasets.benchmark_results import load_benchmark_results
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
@@ -21,7 +24,12 @@ prediction_router = APIRouter(prefix="/prediction")
 PARIS_TZ = ZoneInfo("Europe/Paris")
 
 
+# Modèles servis par l'API (l'identifiant est le même que dans l'onglet « Prédire » du frontend)
+ModelId = Literal["mlp", "lightgbm"]
+
+
 class PredictionRequest(BaseModel):
+    model: ModelId = "mlp"
     date: str
     hour: int | float
     temperatures: dict[str, float]
@@ -36,6 +44,7 @@ class PredictionResponse(BaseModel):
 
 
 class BatchPredictionRequest(BaseModel):
+    model: ModelId = "mlp"
     items: list[PredictionRequest]
 
 
@@ -107,6 +116,22 @@ scaler_X = joblib.load("data/scaler_X.pkl")
 scaler_Y = joblib.load("data/scaler_Y.pkl")
 
 
+_lightgbm = None
+
+
+def get_method(model_id: str) -> PredictionModelPort:
+    """Méthode de prédiction du modèle demandé. Le LightGBM est chargé au premier appel (fichier data/lightgbm.pkl)."""
+    global _lightgbm
+    if model_id == "lightgbm":
+        if _lightgbm is None:
+            try:
+                _lightgbm = joblib.load("data/lightgbm.pkl")
+            except FileNotFoundError:
+                raise HTTPException(status_code=503, detail="Modèle LightGBM indisponible : lancer scripts/train_lightgbm.py")
+        return PredictWithLightGBM(_lightgbm)
+    return PredictWithPytorch(model, scaler_X, scaler_Y)
+
+
 class RTEConsumptionResponse(BaseModel):
     consumption_mw: int
 
@@ -151,17 +176,17 @@ async def get_rte_now(date: str, hour: int):
 @prediction_router.post("/predict", dependencies=[Depends(checker.authorized_request)], response_model=PredictionResponse)
 def predict_consumption(data: PredictionRequest):
     domain_input = PredictionInput(data.date, data.hour, data.temperatures, data.wind_speeds, data.humidities)
-    method = PredictWithPytorch(model, scaler_X, scaler_Y)
+    method = get_method(data.model)
     use_case = PredictConsumptionUseCase(domain_input, method)
     response = use_case.execute_prediction_item()
     result = PredictionResult(response.date, response.hour, response.power)
-    logger.info("Prédiction demandée pour le %s à %sh", data.date, data.hour)
+    logger.info("Prédiction %s demandée pour le %s à %sh", data.model, data.date, data.hour)
     return PredictionResponse(date=result.date, hour=result.hour, power=result.power)
 
 
 @prediction_router.post("/batch-predict", dependencies=[Depends(checker.authorized_request)], response_model=BatchPredictionResponse)
 def batch_predict(data: BatchPredictionRequest):
-    method = PredictWithPytorch(model, scaler_X, scaler_Y)
+    method = get_method(data.model)
     results = []
     for item in data.items:
         domain_input = PredictionInput(item.date, item.hour, item.temperatures, item.wind_speeds, item.humidities)
@@ -169,7 +194,7 @@ def batch_predict(data: BatchPredictionRequest):
         resp = use_case.execute_prediction_item()
         result = PredictionResult(resp.date, resp.hour, resp.power)
         results.append(PredictionResponse(date=result.date, hour=result.hour, power=result.power))
-    logger.info("Batch predict : %d prédictions exécutées", len(results))
+    logger.info("Batch predict (%s) : %d prédictions exécutées", data.model, len(results))
     return BatchPredictionResponse(items=results)
 
 

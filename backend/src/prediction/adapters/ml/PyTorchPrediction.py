@@ -1,6 +1,7 @@
 from src.prediction.domain.models_prediction import PredictionInput, ModelMetrics, PredictionResult
 from src.prediction.ports.predict import PredictionModelPort, EvaluateModelPort
 from src.prediction.domain.features import build_features
+from src.prediction.adapters.ml.raw_input import raw_row_from_input
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import torch
@@ -41,22 +42,7 @@ class PredictWithPytorch(PredictionModelPort):
         self.scaler_Y = scaler_Y
 
     def predict_item(self, input: PredictionInput) -> PredictionResult:
-        # Conversion heure locale Paris → UTC (les données d'entraînement sont en UTC)
-        local_date = pd.to_datetime(input.date, format="%d/%m/%Y")
-        local_dt = datetime(
-            local_date.year, local_date.month, local_date.day,
-            int(input.hour), 0, 0, tzinfo=PARIS_TZ
-        )
-        utc_dt = local_dt.astimezone(timezone.utc)
-
-        # Données brutes au même format que le jeu d'entraînement (jour et heure UTC, météo par région)
-        raw = {"date": utc_dt.strftime("%d/%m/%Y"), "hour": utc_dt.hour}
-        for region, temp in input.temp_regions.items():
-            raw[f"temperature_{region}"] = temp
-        for region, wind_speed in input.wind_regions.items():
-            raw[f"wind_speed_{region}"] = wind_speed
-        for region, humidity in input.humidity_regions.items():
-            raw[f"humidity_{region}"] = humidity
+        raw = raw_row_from_input(input)
 
         date_originale = input.date
         hour_originale = input.hour

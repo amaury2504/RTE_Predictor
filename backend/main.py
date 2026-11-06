@@ -14,6 +14,8 @@ app.add_middleware(
     middleware_class=CORSMiddleware,
     # Origines autorisées, séparées par des virgules. Inutile si le frontend est servi sur le même domaine que l'API.
     allow_origins=[o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",") if o.strip()],
+    # En développement (ALLOWED_ORIGINS non défini), tout port de localhost est accepté : Vite change de port si 5173 est pris.
+    allow_origin_regex=None if os.getenv("ALLOWED_ORIGINS") else r"http://(localhost|127\.0\.0\.1):\d+",
     allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],
 )

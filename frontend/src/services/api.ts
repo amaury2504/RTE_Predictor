@@ -112,14 +112,14 @@ export const fetchRTENow = async (date: string, hour: number, token: string): Pr
     return data.consumption_mw
 }
 
-export const predict = async (data: PredictionRequest, token: string): Promise<PredictionResponse> => {
+export const predict = async (data: PredictionRequest, token: string, model: string = "mlp"): Promise<PredictionResponse> => {
     const response = await fetch(`${BASE_URL}/prediction/predict`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify({ ...data, model })
     })
     if (!response.ok) {
         const errorData = await response.json()
@@ -136,14 +136,14 @@ export interface BatchItem {
     humidities: Record<string, number>
 }
 
-export const batchPredict = async (items: BatchItem[], token: string): Promise<PredictionResponse[]> => {
+export const batchPredict = async (items: BatchItem[], token: string, model: string = "mlp"): Promise<PredictionResponse[]> => {
     const res = await fetch(`${BASE_URL}/prediction/batch-predict`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ model, items }),
     })
     if (!res.ok) {
         const err = await res.json()

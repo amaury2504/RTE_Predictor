@@ -11,7 +11,7 @@ export interface ModelInfo {
 /** Couleur par type de modèle (trois premières teintes de la palette catégorielle, validées sur fond sombre). */
 export const KIND_COLOR: Record<ModelKind, string> = {
     trackA: "#3987e5",
-    reference: "#d95926",
+    reference: "#5b6c8a",
     trackB: "#199e70",
     series: "#c98500",
 }

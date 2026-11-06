@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import LogoMark from "./LogoMark"
+import { useInShell } from "./shellContext"
 
 interface NavbarProps {
     /** Si défini, affiche un bouton « Retour » à gauche du logo */
@@ -11,6 +12,8 @@ interface NavbarProps {
 }
 
 export default function Navbar({ onBack, right, maxWidth = "4xl" }: NavbarProps) {
+    // Dans la coquille, la navigation est portée par la sidebar : pas de barre du haut en double
+    if (useInShell()) return null
     return (
         <nav className="sticky top-0 z-40 border-b border-line bg-canvas/80 backdrop-blur">
             <div className={`mx-auto flex items-center justify-between px-6 py-3.5 ${maxWidth === "5xl" ? "max-w-5xl" : "max-w-4xl"}`}>

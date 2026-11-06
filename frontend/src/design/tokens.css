@@ -1,0 +1,69 @@
+/*
+ * Jetons de design « verre sombre ». Une seule famille de teintes : le bleu.
+ * Le vert (succès) et l'ambre/rouge (alerte) sont réservés aux états, jamais à la décoration.
+ * Les durées et ressorts d'animation sont dans design/motion.ts.
+ */
+:root {
+    /* Fond */
+    --bg-0: #050a14;
+    --bg-1: #0a1322;
+
+    /* Verre */
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-bg-hover: rgba(255, 255, 255, 0.085);
+    --glass-border: rgba(255, 255, 255, 0.11);
+    --glass-highlight: rgba(255, 255, 255, 0.16);
+    --glass-blur: 22px;
+    --glass-shadow: 0 20px 60px -24px rgba(0, 0, 0, 0.7);
+
+    /* Séries de données et signature de marque (variante B retenue : bleu et orange) */
+    --series-real: #3987e5;
+    --series-predicted: #ff9a3d;
+    --brand-glow: rgba(255, 154, 61, 0.6);
+
+    /* Accents : bleu pour l'interface */
+    --accent: #1ea0ff;
+    --accent-soft: #5cc0ff;
+    --accent-deep: #2b78e0;
+    --accent-glow: rgba(30, 160, 255, 0.35);
+
+    /* États */
+    --state-ok: #34d399;
+    --state-warn: #fbbf24;
+    --state-danger: #f87171;
+
+    /* Texte */
+    --text-1: rgba(255, 255, 255, 0.95);
+    --text-2: rgba(255, 255, 255, 0.65);
+    --text-3: rgba(255, 255, 255, 0.40);
+
+    /* Formes */
+    --radius-card: 24px;
+    --radius-pill: 999px;
+}
+
+/* Réglage « animations réduites » : posé sur <html> par l'application */
+html[data-reduce-motion="true"] {
+    --glass-blur: 14px;
+}
+
+.tabular {
+    font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Test A/B de la couleur de marque (à trancher) : seules les variables ci-dessous changent.
+ * A : tout en bleu, la série « prédit » est un bleu clair en pointillé.
+ * B : bleu et orange (CDC) : la série « prédit » et la lueur de la sidebar sont orange.
+ */
+[data-variant="A"] {
+    --series-real: #3987e5;
+    --series-predicted: #8fd4ff;
+    --brand-glow: rgba(30, 160, 255, 0.55);
+}
+
+[data-variant="B"] {
+    --series-real: #3987e5;
+    --series-predicted: #ff9a3d;
+    --brand-glow: rgba(255, 154, 61, 0.6);
+}

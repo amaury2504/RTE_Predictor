@@ -17,7 +17,7 @@ export default function KpiCard({ label, value, hint, tone = "default" }: KpiIte
     return (
         <div className="rounded-xl border border-line bg-surface p-5 shadow-card">
             <p className="text-xs font-medium uppercase tracking-widest text-muted">{label}</p>
-            <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${TONE_CLASS[tone]}`}>{value}</p>
+            <p className={`mt-1.5 whitespace-nowrap text-2xl font-semibold tabular-nums ${TONE_CLASS[tone]}`}>{value}</p>
             <p className="mt-1.5 text-xs leading-snug text-faint">{hint}</p>
         </div>
     )

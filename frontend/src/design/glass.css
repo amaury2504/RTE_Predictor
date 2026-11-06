@@ -1,0 +1,164 @@
+/* Briques de verre (cartes, boutons) et fond animé. Les valeurs viennent de tokens.css. */
+
+@layer components {
+
+    /* Surface en verre dépoli : flou, bordure fine, liseré lumineux en haut, ombre profonde */
+    .glass-card {
+        position: relative;
+        border-radius: var(--radius-card);
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+        box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+        transition: background-color 250ms, border-color 250ms;
+    }
+
+
+    .glass-card-interactive {
+        transition: background-color 250ms, border-color 250ms, transform 250ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+
+    .glass-card-interactive:hover {
+        background: var(--glass-bg-hover);
+        border-color: rgba(255, 255, 255, 0.2);
+        transform: translateY(-5px);
+    }
+
+
+    .glass-button {
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--glass-border);
+        background: var(--glass-bg);
+        padding: 0.55rem 1.1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-1);
+        box-shadow: inset 0 1px 0 var(--glass-highlight);
+        transition: background-color 150ms, border-color 150ms, transform 150ms;
+    }
+
+
+    .glass-button:active {
+        transform: scale(0.97);
+    }
+
+
+    .glass-button:hover {
+        background: var(--glass-bg-hover);
+    }
+
+
+    .glass-button-primary {
+        background: var(--accent-deep);
+        border-color: rgba(92, 192, 255, 0.5);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 0 24px -6px var(--accent-glow);
+    }
+
+
+    .glass-button-primary:hover {
+        background: var(--accent);
+    }
+
+
+    /* Focus visible sur tout élément interactif (navigation au clavier) */
+    .glass-button:focus-visible,
+    .glass-card:focus-visible {
+        outline: 2px solid var(--accent-soft);
+        outline-offset: 2px;
+    }
+
+
+    .aurora-ribbon {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(70px);
+        will-change: transform;
+    }
+
+
+    /* Pause quand l'onglet est masqué ou que les animations sont réduites par réglage */
+    .aurora-paused .aurora-ribbon,
+    html[data-reduce-motion="true"] .aurora-ribbon {
+        animation-play-state: paused !important;
+    }
+
+}
+
+
+
+/* Fond animé : rubans lumineux bleus, mouvement très lent, `transform` uniquement */
+@keyframes aurora-drift-a {
+    0%, 100% { transform: translate3d(-6%, -4%, 0) rotate(-12deg); }
+    50% { transform: translate3d(8%, 6%, 0) rotate(-6deg); }
+}
+
+
+@keyframes aurora-drift-b {
+    0%, 100% { transform: translate3d(6%, 8%, 0) rotate(18deg); }
+    50% { transform: translate3d(-8%, -6%, 0) rotate(10deg); }
+}
+
+
+@keyframes aurora-drift-c {
+    0%, 100% { transform: translate3d(0, 6%, 0) rotate(-30deg) scale(1); }
+    50% { transform: translate3d(-5%, -8%, 0) rotate(-24deg) scale(1.08); }
+}
+
+
+/* Préférence du système : fond figé */
+@media (prefers-reduced-motion: reduce) {
+    .aurora-ribbon {
+        animation: none !important;
+    }
+}
+
+
+/* Mouvement réduit : ni élévation ni appui animés */
+@media (prefers-reduced-motion: reduce) {
+    .glass-card-interactive:hover {
+        transform: none;
+    }
+
+    .glass-button:active {
+        transform: none;
+    }
+}
+
+
+/* Titre de page : un reflet orange traverse le texte une seule fois au chargement (dégradé qui défile, découpé dans les lettres) */
+.title-sheen {
+    background-image: linear-gradient(
+        105deg,
+        var(--text-1) 0%,
+        var(--text-1) 38%,
+        #ffb066 46%,
+        var(--series-predicted) 50%,
+        #ffb066 54%,
+        var(--text-1) 62%,
+        var(--text-1) 100%
+    );
+    background-size: 250% 100%;
+    background-position: 100% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: title-sheen 2.4s ease-in-out 0.4s 1 both;
+}
+
+@keyframes title-sheen {
+    from { background-position: 100% 0; }
+    to { background-position: 0% 0; }
+}
+
+/* Mouvement réduit : texte uni, sans reflet */
+@media (prefers-reduced-motion: reduce) {
+    .title-sheen {
+        animation: none;
+        background-image: none;
+        color: var(--text-1);
+        -webkit-text-fill-color: currentColor;
+    }
+}

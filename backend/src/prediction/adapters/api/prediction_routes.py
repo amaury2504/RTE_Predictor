@@ -12,6 +12,7 @@ from src.prediction.adapters.ml.series_prediction import PredictWithHoltWinters,
 from src.prediction.adapters.ml.timestral_loader import load_timestral, INSTALL_HINT
 from src.prediction.adapters.datasets.rte_history import RteConsumptionHistory
 from src.prediction.ports.consumption_history import ConsumptionHistoryUnavailable
+import os
 import threading
 from src.prediction.ports.predict import PredictionModelPort
 from src.prediction.adapters.datasets.benchmark_results import load_benchmark_results
@@ -140,11 +141,24 @@ def _load_regressor(model_id: str):
         raise HTTPException(status_code=503, detail=f"Modèle {model_id} indisponible : lancer scripts/train_regressor.py {model_id}")
 
 
+# Taille de Timestral servie : la 28M tient dans la mémoire d'un petit serveur (la 209M est plus précise mais bien plus lourde)
+TIMESTRAL_MODEL = os.getenv("TIMESTRAL_MODEL", "mistralai/Timestral-28M")
+
+
 def _load_timestral():
     try:
-        return _load_once("timestral", load_timestral)
+        return _load_once("timestral", lambda: load_timestral(TIMESTRAL_MODEL))
     except ImportError:
         raise HTTPException(status_code=503, detail=f"Timestral indisponible : {INSTALL_HINT}")
+
+
+def preload_timestral() -> None:
+    """Charge Timestral à l'avance (appelé en tâche de fond au démarrage) : le premier visiteur n'attend pas les poids."""
+    try:
+        _load_timestral()
+        logger.info("Timestral préchargé (%s)", TIMESTRAL_MODEL)
+    except Exception as e:  # le démarrage de l'API ne doit jamais dépendre de ce modèle optionnel
+        logger.warning("Préchargement de Timestral impossible : %s", e)
 
 
 def get_method(model_id: str) -> PredictionModelPort:

@@ -13,8 +13,10 @@ services:
       # Les bases SQLite sont dans le volume : elles survivent aux redémarrages et aux mises à jour
       DATABASE_URL: sqlite:////app/data/electricity.db
       DATABASE_AUTH_URL: sqlite:////app/data/auth.db
+      # Charge Timestral au démarrage, en tâche de fond : le premier visiteur n'attend pas les poids
+      TIMESTRAL_PRELOAD: "true"
     volumes:
-      # Contient model.pth, scaler_X.pkl, scaler_Y.pkl (non versionnés) et les bases SQLite
+      # Contient model.pth, scaler_*.pkl, lightgbm.pkl, ridge.pkl (non versionnés), les bases SQLite et le cache des poids Timestral
       - ./data:/app/data
     mem_limit: 1g          # PyTorch consomme de la mémoire : on protège les autres projets du serveur
     networks: [default]

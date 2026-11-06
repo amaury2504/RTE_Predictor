@@ -1,12 +1,22 @@
 import os
+import threading
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from src.auth.adapters.api.auth_routes import auth_router
 from src.electricity.adapters.api.electricity_routes import electricity_router
 from fastapi.middleware.cors import CORSMiddleware
-from src.prediction.adapters.api.prediction_routes import prediction_router
+from src.prediction.adapters.api.prediction_routes import prediction_router, preload_timestral
 
 
-app=FastAPI()
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # TIMESTRAL_PRELOAD=true : charge Timestral en tâche de fond, sans retarder le démarrage ni la sonde de santé
+    if os.getenv("TIMESTRAL_PRELOAD", "false").lower() in ("1", "true", "yes"):
+        threading.Thread(target=preload_timestral, daemon=True).start()
+    yield
+
+
+app=FastAPI(lifespan=lifespan)
 
 # Ajout du middleware CORS à mon app
 

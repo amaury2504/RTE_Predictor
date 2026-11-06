@@ -59,7 +59,7 @@ mkdir -p data
 Depuis le poste où le modèle a été entraîné :
 
 ```bash
-scp backend/data/model.pth backend/data/scaler_X.pkl backend/data/scaler_Y.pkl utilisateur@serveur:~/RTE_Predictor/deploy/data/
+scp backend/data/model.pth backend/data/scaler_X.pkl backend/data/scaler_Y.pkl backend/data/lightgbm.pkl backend/data/ridge.pkl utilisateur@serveur:~/RTE_Predictor/deploy/data/
 ```
 
 Puis, sur le serveur :

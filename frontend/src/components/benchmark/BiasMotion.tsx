@@ -49,7 +49,7 @@ export default function BiasMotion({ results }: { results: BenchmarkResults }) {
                 ? [{ id: f.id, label: f.label, color: f.id === "lightgbm" ? CHART.best : CHART.model, before, after }]
                 : []
         }),
-        ...["ts_timestral_209m_meteo", "ts_holt_winters"].flatMap(id => {
+        ...["ts_timestral_28m_meteo", "ts_holt_winters"].flatMap(id => {
             const p = at(rowOf(results, id))
             return p ? [{ id, label: shortName(id), color: CHART.model, before: p, after: p }] : []
         }),

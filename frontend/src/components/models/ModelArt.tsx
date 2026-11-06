@@ -183,7 +183,7 @@ export function TimestralArt({ reduce }: ArtProps) {
             </g>
             <rect className="ts-block" x={TS_BLOCK.x} y={TS_BLOCK.y} width={TS_BLOCK.w} height={TS_BLOCK.h} rx={16}
                 fill={BLUE} fillOpacity={0.18} stroke={SOFT} strokeOpacity={0.7} strokeWidth={1.5} />
-            <text x={TS_BLOCK.x + TS_BLOCK.w / 2} y={TS_BLOCK.y + TS_BLOCK.h / 2 + 5} textAnchor="middle" fontSize={15} fontWeight={600} fill="#e8eef8">209M</text>
+            <text x={TS_BLOCK.x + TS_BLOCK.w / 2} y={TS_BLOCK.y + TS_BLOCK.h / 2 + 5} textAnchor="middle" fontSize={15} fontWeight={600} fill="#e8eef8">28M</text>
             <g className="ts-fade">
                 {TS_FUTURE.map((h, i) => (
                     <rect key={`f${i}`} className="ts-future" x={252 + i * 16} y={TS_BASE - h * 1.4} width={10} height={h * 1.4} rx={3}

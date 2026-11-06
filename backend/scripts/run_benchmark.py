@@ -173,7 +173,7 @@ def main():
                         help="nombre de graines pour les modèles longs (MLP) ; défaut : même valeur que --seeds")
     parser.add_argument("--no-timestral", action="store_true", help="ne pas évaluer Timestral (modèle de fondation)")
     parser.add_argument("--timestral-models", nargs="+",
-                        default=["mistralai/Timestral-209M", "mistralai/Timestral-28M"],
+                        default=["mistralai/Timestral-28M"],
                         help="identifiants Hugging Face des tailles de Timestral à évaluer")
     parser.add_argument("--no-cache", action="store_true",
                         help="ne pas sauvegarder ni relire les exécutions terminées")

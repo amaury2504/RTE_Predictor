@@ -23,9 +23,9 @@ const MODELS: ModelInfo[] = [
         kind: "Réseau de neurones",
         Art: MlpArt,
         lines: [
-            "Des couches d'unités combinent météo, heure et calendrier.",
-            "Les poids s'ajustent pour réduire l'erreur sur l'historique.",
-            "C'est le modèle servi par l'API, avant correction du biais.",
+            "Extraction des caractéristiques...",
+            "Les poids s'ajustent à chaque itération pour réduire l'erreur",
+            "C'est ce qu'on entend traditionnellement par réseaux de neurones",
         ],
     },
     {

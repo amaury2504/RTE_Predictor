@@ -15,15 +15,15 @@ export interface NavGroup {
     items: NavItem[]
 }
 
-/** Trois onglets : la prédiction d'abord (fonction principale), puis la comparaison, puis l'explication des modèles. */
+/** Trois onglets : la prédiction d'abord (fonction principale), puis l'explication des modèles, puis leur comparaison. */
 export const NAV_GROUPS: NavGroup[] = [
     {
         id: "main",
         label: "Navigation",
         items: [
             { to: "/predict", label: "Prédire", icon: Zap },
-            { to: "/benchmark", label: "Comparaison de modèles", shortLabel: "Comparer", icon: BarChart3 },
             { to: "/modeles", label: "Modèles", icon: BrainCircuit },
+            { to: "/benchmark", label: "Comparaison de modèles", shortLabel: "Comparer", icon: BarChart3 },
         ],
     },
 ]

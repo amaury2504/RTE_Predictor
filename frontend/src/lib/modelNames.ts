@@ -11,8 +11,7 @@ const SHORT: Record<string, string> = {
     ridge: "Ridge",
     ridge_corr: "Ridge",
     ridge_niveau_corr: "Ridge",
-    ts_timestral_209m_meteo: "Timestral",
-    ts_timestral_28m_meteo: "Timestral S",
+    ts_timestral_28m_meteo: "Timestral 28M",
     ts_holt_winters: "Holt-Winters",
     ref_rte_j1: "RTE (veille)",
     ref_rte_j: "RTE (jour)",
@@ -24,7 +23,7 @@ export const shortName = (model: string): string => SHORT[model] ?? describeMode
 /** Les cinq modèles comparés : tous avec leurs meilleures conditions (correction du biais, consommation récente). */
 export const PRIMARY_MODELS = [
     "lightgbm_niveau_corr",
-    "ts_timestral_209m_meteo",
+    "ts_timestral_28m_meteo",
     "mlp_niveau_corr",
     "ridge_niveau_corr",
     "ts_holt_winters",

@@ -15,7 +15,7 @@ const results: BenchmarkResults = {
     protocol: { scheme: "glissant", test_years: [2022, 2023, 2024], seeds: [0], refit_on_train_and_val: true, recency_half_life_years: 3 },
     summary: [
         row("ref_rte_j", 1.05), row("ref_rte_j1", 1.21), row("ref_naive_j1", 2.57),
-        row("lightgbm_niveau_corr", 1.21), row("lightgbm", 2.91), row("ts_timestral_209m_meteo", 1.3),
+        row("lightgbm_niveau_corr", 1.21), row("lightgbm", 2.91), row("ts_timestral_28m_meteo", 1.3),
         row("ridge", 3.78), row("mlp", 3.11),
     ],
     by_fold: [],
@@ -51,8 +51,8 @@ describe("sélecteurs du benchmark", () => {
 
 describe("sélection des modèles comparés", () => {
     it("ne garde que les modèles demandés et les repères, classés par erreur, en ignorant les absents", () => {
-        const rows = primaryRows(results, ["lightgbm_niveau_corr", "ts_timestral_209m_meteo", "modele_absent"], ["ref_naive_j1"])
-        expect(rows.map(r => r.model)).toEqual(["lightgbm_niveau_corr", "ts_timestral_209m_meteo", "ref_naive_j1"])
+        const rows = primaryRows(results, ["lightgbm_niveau_corr", "ts_timestral_28m_meteo", "modele_absent"], ["ref_naive_j1"])
+        expect(rows.map(r => r.model)).toEqual(["lightgbm_niveau_corr", "ts_timestral_28m_meteo", "ref_naive_j1"])
     })
 })
 

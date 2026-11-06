@@ -23,5 +23,5 @@ try {
     Write-Host "Fin : $(Get-Date -Format 'dd/MM/yyyy HH:mm') (code de sortie Python : $LASTEXITCODE)"
 }
 finally {
-    [Win.Power]::SetThreadExecutionState(0x80000000) | Out-Null   # ES_CONTINUOUS : la veille redevient possible
+    [Win.Power]::SetThreadExecutionState([uint32]2147483648) | Out-Null   # ES_CONTINUOUS : la veille redevient possible
 }

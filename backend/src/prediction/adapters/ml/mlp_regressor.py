@@ -100,17 +100,25 @@ class MLPRegressor(RegressorPort):
         """Poids de moyenne 1, pour que l'échelle de la perte ne dépende pas de la pondération."""
         return None if w is None else torch.FloatTensor(np.asarray(w, dtype=float) / np.mean(w))
 
+    def _scale(self, X) -> np.ndarray:
+        """Remplace les valeurs manquantes par la moyenne d'entraînement, puis normalise."""
+        A = np.asarray(X, dtype=float)
+        filled = pd.DataFrame(np.where(np.isnan(A), self.fill_, A), columns=self.feature_names_)
+        return self.scaler_X.transform(filled)   # mêmes noms de colonnes qu'à l'ajustement : pas d'avertissement
+
     def fit(self, X_train, y_train, X_val, y_val, w_train=None, w_val=None) -> None:
         self.feature_names_ = list(X_train.columns)
         y_tr = np.asarray(y_train).reshape(-1, 1)
         y_va = np.asarray(y_val).reshape(-1, 1)
 
         # Étape 1 : normaliseurs appris sur l'entraînement seul, arrêt anticipé sur la validation
+        # Valeurs manquantes (début de série pour les variables de niveau) : moyenne d'entraînement
+        self.fill_ = X_train.mean().to_numpy()
         self.scaler_X = MinMaxScaler().fit(X_train)
         self.scaler_Y = MinMaxScaler().fit(y_tr)
-        X_va_scaled = torch.FloatTensor(self.scaler_X.transform(X_val[self.feature_names_]))
+        X_va_scaled = torch.FloatTensor(self._scale(X_val[self.feature_names_]))
         model, best_epoch = self._train(
-            torch.FloatTensor(self.scaler_X.transform(X_train)),
+            torch.FloatTensor(self._scale(X_train)),
             torch.FloatTensor(self.scaler_Y.transform(y_tr)),
             self._weights(w_train),
             X_va_scaled,
@@ -125,10 +133,11 @@ class MLPRegressor(RegressorPort):
             X_all = pd.concat([X_train, X_val[self.feature_names_]], ignore_index=True)
             y_all = np.concatenate([y_tr, y_va])
             w_all = None if w_train is None or w_val is None else np.concatenate([w_train, w_val])
+            self.fill_ = X_all.mean().to_numpy()
             self.scaler_X = MinMaxScaler().fit(X_all)
             self.scaler_Y = MinMaxScaler().fit(y_all)
             self.model, _ = self._train(
-                torch.FloatTensor(self.scaler_X.transform(X_all)),
+                torch.FloatTensor(self._scale(X_all)),
                 torch.FloatTensor(self.scaler_Y.transform(y_all)),
                 self._weights(w_all),
                 None, None,
@@ -138,7 +147,7 @@ class MLPRegressor(RegressorPort):
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if self.model is None:
             raise RuntimeError("Le modèle doit être entraîné (fit) avant de prédire")
-        scaled = torch.FloatTensor(self.scaler_X.transform(X[self.feature_names_]))
+        scaled = torch.FloatTensor(self._scale(X[self.feature_names_]))
         with torch.no_grad():
             normalized = self.model(scaled).numpy()
         return self.scaler_Y.inverse_transform(normalized).ravel()

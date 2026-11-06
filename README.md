@@ -6,7 +6,7 @@ strict. L'application web sert un modèle PyTorch ; le benchmark compare Ridge, 
 simples, avec et sans la consommation récente.
 
 Projet pédagogique de bout en bout : données (RTE eco2mix 2012-2024, Open-Meteo), API FastAPI, interface
-React, benchmark reproductible, 310 tests automatisés.
+React, benchmark reproductible, 312 tests automatisés.
 
 ## Ce que ce projet montre
 
@@ -32,6 +32,7 @@ consommation moyenne d'environ 50 GW. Le biais est positif quand le modèle sure
 | Prévision RTE du jour (référence) | 1,05 | 0,68 | -0,95 | prévisions RTE |
 | **LightGBM + niveau récent + correction du biais** | **1,21** | 1,21 | +0,12 | météo, calendrier, consommation passée |
 | Timestral 209M + météo (aucun entraînement) | 1,30 | 1,30 | -0,08 | consommation passée, température, jours fériés |
+| MLP PyTorch + niveau récent + correction du biais (4 graines) | 1,38 | 1,38 | +0,11 | météo, calendrier, consommation passée |
 | LightGBM + niveau récent | 1,42 | 1,27 | +0,90 | météo, calendrier, consommation passée |
 | LightGBM + correction du biais récent | 1,71 | 1,71 | +0,11 | météo, calendrier |
 | MLP PyTorch + correction du biais récent (4 graines) | 1,90 | 1,90 | +0,11 | météo, calendrier |
@@ -63,8 +64,10 @@ courbe de la justesse du niveau. Le tableau complet, année par année, est dans
    fait 1,30 GW, mieux que tous nos modèles de la piste A corrigés. Avec la météo observée comme prévision
    parfaite, ce qui l'avantage face à RTE.
 6. **Le MLP PyTorch souffre du même défaut que LightGBM** (MAE centrée 2,04 GW, proche des 1,92 GW de LightGBM) et
-   il est instable d'une graine à l'autre (± 0,4 à 0,7 GW en 2023 et 2024, contre ± 0,01 pour LightGBM). Sur des
-   données tabulaires, le réseau de neurones n'apporte rien de plus que les arbres boostés.
+   il est instable d'une graine à l'autre (± 0,4 à 0,7 GW en 2023 et 2024, contre ± 0,01 pour LightGBM). Avec la
+   consommation récente, l'instabilité disparaît (± 0,1 GW) et il passe de 3,11 à 1,70 GW, puis à 1,38 GW avec la
+   correction du biais. À information égale, LightGBM reste un peu meilleur (1,21 GW) : sur des données
+   tabulaires, le réseau de neurones n'apporte rien de plus que les arbres boostés.
 
 ## Stack technique
 
@@ -191,7 +194,7 @@ Le MLP passe en premier (4 graines), puis le reste. Chaque exécution terminée 
 **Timestral** (facultatif) : `pip install git+https://github.com/mistralai/timestral.git` dans l'environnement
 du backend. Sans lui, le benchmark ignore ces deux lignes et le signale.
 
-Les tests : `cd backend && python -m pytest tests -q` (310 tests).
+Les tests : `cd backend && python -m pytest tests -q` (312 tests).
 
 ---
 

@@ -140,6 +140,7 @@ modèles de la piste A.
 | ref_rte_j1 (prévision RTE de la veille) | 1,21 | 0,93 | −0,92 |
 | **Piste B** lightgbm_niveau_corr | 1,21 | 1,21 | +0,12 |
 | **Fondation** ts_timestral_209m_meteo | 1,30 | 1,30 | −0,08 |
+| **Piste B** mlp_niveau_corr (4 graines) | 1,38 | 1,38 | +0,11 |
 | **Piste B** lightgbm_niveau | 1,42 | 1,27 | +0,90 |
 | **Fondation** ts_timestral_28m_meteo | 1,72 | 1,71 | −0,15 |
 | **Piste A** lightgbm_corr | 1,71 | 1,71 | +0,11 |
@@ -147,6 +148,7 @@ modèles de la piste A.
 | **Piste B** ridge_niveau_corr | 1,79 | 1,79 | +0,11 |
 | **Piste A** mlp_corr (4 graines) | 1,90 | 1,90 | +0,11 |
 | **Piste A** mlp_recent_corr (4 graines) | 1,92 | 1,92 | +0,09 |
+| **Piste B** mlp_niveau (4 graines) | 1,70 | 1,48 | +1,02 |
 | **Piste B** ridge_niveau | 2,02 | 1,82 | +1,01 |
 | **Fondation** ts_timestral_209m | 2,20 | 2,20 | −0,08 |
 | **Fondation** ts_timestral_28m | 2,31 | 2,30 | −0,11 |
@@ -185,10 +187,16 @@ Ce que cela dit, et ce que cela ne dit pas :
    (1,92 GW), donc l'écart de niveau domine aussi son erreur ; la correction du biais le ramène à 1,90 GW. Il est
    instable d'une graine à l'autre (± 0,4 à 0,7 GW en 2023 et 2024, contre ± 0,01 pour LightGBM) : un seul
    entraînement ne serait pas fiable. Ses années récentes pondérées (`mlp_recent`) ne changent pas le diagnostic.
-8. **Timestral 209 M avec météo (1,30 GW), sans entraînement,** bat tous les modèles de la piste A corrigés
+8. **Le MLP avec le niveau récent (`mlp_niveau`) répond à la question « le MLP est-il mauvais en soi ? »** Non :
+   privé de la consommation récente il fait 3,11 GW ; avec elle 1,70 GW (MAE centrée 1,48 GW), et 1,38 GW avec la
+   correction du biais (biais +0,11 GW). L'instabilité entre graines disparaît (± 0,02 à 0,2 GW selon l'année).
+   Il reste derrière LightGBM à information égale (1,21 GW) : les arbres boostés gardent un petit avantage sur
+   ces données tabulaires. Le MLP manquait de valeurs de niveau en début de série : elles sont remplacées par la
+   moyenne d'entraînement (comme pour Ridge), apprise sur l'entraînement seul.
+9. **Timestral 209 M avec météo (1,30 GW), sans entraînement,** bat tous les modèles de la piste A corrigés
    et reste au niveau de la prévision RTE de la veille, avec la réserve de la météo « parfaite » (section 3.4).
    Sans météo, il fait 2,20 GW, un peu mieux que le lissage exponentiel (2,39 GW).
-9. Dans `RESULTS.md`, le « ± » du classement global est l'écart entre années de test ; l'écart entre graines
+10. Dans `RESULTS.md`, le « ± » du classement global est l'écart entre années de test ; l'écart entre graines
    (LightGBM, MLP) est dans le détail par année. Le Ridge, déterministe, n'en a pas.
 
 ## 6. Choix transverses
@@ -207,7 +215,6 @@ Ce que cela dit, et ce que cela ne dit pas :
 
 ## 7. Ce qui reste à faire
 
-- MLP avec le niveau récent (`mlp_niveau`) : seule famille sans variante de piste B (section 3.5 quand mesuré).
 - Autres séries temporelles et modèles de séquence (SARIMAX, GRU, CNN 1D, TCN) puis modèles de fondation (Chronos, TimesFM).
 - Surveiller le biais glissant en production et réentraîner au-delà d'un seuil (non commencé).
 - Déploiement d'une démo (section 10 du CDC).

@@ -112,3 +112,16 @@ def test_les_poids_changent_le_resultat(data):
 def test_nom_de_la_variante_ponderee():
     assert MLPRegressor().name == "mlp"
     assert MLPRegressor(recency_half_life_years=3.0).name == "mlp_recent"
+
+
+def test_les_valeurs_manquantes_sont_remplacees_par_la_moyenne_d_entrainement(data):
+    X_tr, y_tr, X_va, y_va = data
+    X_tr, X_va = X_tr.copy(), X_va.copy()
+    X_tr.iloc[:5, 0] = np.nan   # comme les variables de niveau en début de série
+    X_va.iloc[:2, 1] = np.nan
+    model = MLPRegressor(max_epochs=2, batch_size=32)
+    model.fit(X_tr, y_tr, X_va, y_va)
+
+    pred = model.predict(X_va)
+    assert np.isfinite(pred).all()
+    assert model.fill_[2] == pytest.approx(pd.concat([X_tr, X_va])["c"].mean())  # après réentraînement : entraînement + validation

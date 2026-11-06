@@ -8,13 +8,11 @@ export interface PredictModel {
     name: string
     kind: string
     served: boolean
-    /** Le meilleur du benchmark : seul à porter l'orange. */
-    best?: boolean
 }
 
 export const PREDICT_MODELS: PredictModel[] = [
     { id: "mlp", name: "MLP", kind: "Réseau de neurones", served: true },
-    { id: "lightgbm", name: "LightGBM", kind: "Arbres de décision en série", served: true, best: true },
+    { id: "lightgbm", name: "LightGBM", kind: "Arbres de décision en série", served: true },
     { id: "timestral", name: "Timestral", kind: "Modèle de fondation", served: true },
     { id: "ridge", name: "Ridge", kind: "Régression linéaire", served: true },
     { id: "holt-winters", name: "Holt-Winters", kind: "Lissage exponentiel", served: true },

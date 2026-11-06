@@ -89,10 +89,8 @@ export default function ModelRail({ models, value, onChange, idPrefix }: ModelRa
                         className={`relative flex shrink-0 flex-col items-start justify-center rounded-full px-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent-soft)] items-center ${selected ? "text-white" : "text-[var(--text-2)] hover:text-white"}`}
                     >
                         <span className="whitespace-nowrap text-sm font-medium">{m.name}</span>
-                        {/* Une seule ligne secondaire : « Meilleur » (orange) ou « Bientôt » ; l'état « bientôt » est aussi dit aux lecteurs d'écran */}
-                        {m.best
-                            ? <span className="text-[11px] leading-tight" style={{ color: "var(--series-predicted)" }}>Meilleur</span>
-                            : !m.served && <span className="text-[11px] leading-tight text-[var(--text-2)]">Bientôt</span>}
+                        {/* Ligne secondaire « Bientôt » ; l'état est aussi dit aux lecteurs d'écran */}
+                        {!m.served && <span className="text-[11px] leading-tight text-[var(--text-2)]">Bientôt</span>}
                         {!m.served && <span className="sr-only">, bientôt disponible</span>}
                     </button>
                 )

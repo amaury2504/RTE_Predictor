@@ -141,8 +141,9 @@ def _load_regressor(model_id: str):
         raise HTTPException(status_code=503, detail=f"Modèle {model_id} indisponible : lancer scripts/train_regressor.py {model_id}")
 
 
-# Taille de Timestral servie : la 28M tient dans la mémoire d'un petit serveur (la 209M est plus précise mais bien plus lourde)
-TIMESTRAL_MODEL = os.getenv("TIMESTRAL_MODEL", "mistralai/Timestral-28M")
+# Seule la taille 28M est servie : la 209M (plus précise) pèse trop en mémoire pour le serveur de démo.
+# Le benchmark, lui, évalue toujours les deux tailles.
+TIMESTRAL_MODEL = "mistralai/Timestral-28M"
 
 
 def _load_timestral():

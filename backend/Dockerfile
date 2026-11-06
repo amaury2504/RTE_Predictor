@@ -29,7 +29,7 @@ RUN useradd --create-home --uid 1000 app && mkdir -p /app/data && chown -R app /
 USER app
 
 # Timestral 28M : poids téléchargés une fois depuis Hugging Face, puis gardés dans le volume data/ (survivent aux mises à jour)
-ENV APP_ENV=production PYTHONUNBUFFERED=1 HF_HOME=/app/data/huggingface TIMESTRAL_MODEL=mistralai/Timestral-28M
+ENV APP_ENV=production PYTHONUNBUFFERED=1 HF_HOME=/app/data/huggingface
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD curl -fsS http://localhost:8000/health || exit 1

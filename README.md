@@ -30,12 +30,17 @@ consommation moyenne d'environ 50 GW. Le biais est positif quand le modèle sure
 | Modèle | MAE | MAE centrée | Biais | Information utilisée |
 |---|---|---|---|---|
 | Prévision RTE du jour (référence) | 1,05 | 0,68 | -0,95 | prévisions RTE |
-| **LightGBM + niveau récent** | **1,42** | 1,27 | +0,90 | météo, calendrier, consommation passée |
-| **LightGBM + correction du biais récent** | 1,71 | 1,71 | +0,11 | météo, calendrier |
+| **LightGBM + niveau récent + correction du biais** | **1,21** | 1,21 | +0,12 | météo, calendrier, consommation passée |
+| Timestral 209M + météo (aucun entraînement) | 1,30 | 1,30 | -0,08 | consommation passée, température, jours fériés |
+| LightGBM + niveau récent | 1,42 | 1,27 | +0,90 | météo, calendrier, consommation passée |
+| LightGBM + correction du biais récent | 1,71 | 1,71 | +0,11 | météo, calendrier |
+| MLP PyTorch + correction du biais récent (4 graines) | 1,90 | 1,90 | +0,11 | météo, calendrier |
+| Timestral 209M, consommation seule | 2,20 | 2,20 | -0,08 | consommation passée seule |
 | Lissage exponentiel (Holt-Winters) | 2,39 | 2,39 | -0,03 | consommation passée seule |
 | Naïve J-1 (même heure la veille) | 2,57 | 2,57 | -0,01 | consommation passée |
 | LightGBM | 2,91 | 1,92 | +2,60 | météo, calendrier |
 | Ridge + correction du biais récent | 2,98 | 2,98 | +0,12 | météo, calendrier |
+| MLP PyTorch (4 graines) | 3,11 | 2,04 | +2,76 | météo, calendrier |
 | Ridge | 3,78 | 3,10 | +2,57 | météo, calendrier |
 
 La « MAE centrée » est l'erreur une fois le biais moyen retiré : elle sépare la qualité de la forme de la
@@ -50,11 +55,16 @@ courbe de la justesse du niveau. Le tableau complet, année par année, est dans
    ou de calendrier ne peut l'absorber. **La cause n'est pas établie** avec ces données ; le calendrier coïncide
    avec la crise de l'énergie, sans que ce soit une preuve.
 3. Deux réponses fonctionnent : corriger le biais avec les erreurs récentes (de 2,91 à 1,71 GW, sans réentraîner),
-   ou donner au modèle la consommation récente (1,42 GW).
+   ou donner au modèle la consommation récente (1,42 GW). Les deux combinées donnent 1,21 GW, au niveau de la
+   prévision RTE de la veille (1,21 GW).
 4. Les prévisions publiées par RTE restent meilleures (1,05 à 1,21 GW), car elles disposent d'informations que ce
    projet n'a pas.
-
-Pas encore mesuré : le MLP PyTorch sur le protocole complet à 5 graines.
+5. **Un modèle de fondation sans entraînement** (Timestral 209M de Mistral, avec température et jours fériés)
+   fait 1,30 GW, mieux que tous nos modèles de la piste A corrigés. Avec la météo observée comme prévision
+   parfaite, ce qui l'avantage face à RTE.
+6. **Le MLP PyTorch souffre du même défaut que LightGBM** (MAE centrée 2,04 GW, proche des 1,92 GW de LightGBM) et
+   il est instable d'une graine à l'autre (± 0,4 à 0,7 GW en 2023 et 2024, contre ± 0,01 pour LightGBM). Sur des
+   données tabulaires, le réseau de neurones n'apporte rien de plus que les arbres boostés.
 
 ## Stack technique
 

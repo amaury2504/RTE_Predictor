@@ -112,14 +112,16 @@ la variante météo de la grande taille coûte environ 5 fois plus que la varian
   modèles du projet qui utilisent la météo. Un usage réel recevrait une vraie prévision, moins exacte. **Cela
   avantage tous nos modèles météo face aux prévisions d'RTE**, qui reposent sur une météo prévue : la comparaison
   avec `ref_rte_j` et `ref_rte_j1` est donc plutôt favorable à nos modèles.
-- **Premier résultat (taille 209 M, essai isolé)** : Timestral avec météo fait 1,30 GW de MAE (biais −0,08 GW),
-  sans aucun entraînement sur nos données ; sans météo, 2,20 GW. À confirmer par le lancement complet, avec le 28 M.
+- **Résultat (lancement complet, 2022-2024)** : taille 209 M avec météo 1,30 GW de MAE (biais −0,08 GW), sans
+  aucun entraînement sur nos données ; sans météo 2,20 GW. Taille 28 M : 1,72 GW avec météo, 2,31 GW sans. La
+  grande taille gagne donc environ 0,4 GW avec météo et 0,1 GW sans. Un seul exemplaire par année (modèle
+  déterministe, pas de graine).
 - **Dépendance optionnelle** : `pip install git+https://github.com/mistralai/timestral.git` (absente de
   `pyproject.toml` pour ne pas alourdir l'image de l'API). Sans elle, le benchmark ignore Timestral et le dit.
 - **Licence** : poids sous licence MIT modifiée (interdiction d'usage au-delà de 20 M$ de revenu mensuel pour
   l'entreprise de l'utilisateur) : sans objet pour un projet personnel, mais à connaître.
 - **Les résultats annoncés par Mistral** (premier rang sur plusieurs classements publics) sont ceux de
-  Mistral, sur d'autres données. Ce qui compte ici est la mesure sur notre protocole : **non encore mesurée**.
+  Mistral, sur d'autres données. Ce qui compte est la mesure sur notre protocole, donnée ci-dessus.
 
 ## 4. Nouvelle métrique : la MAE centrée
 
@@ -136,15 +138,25 @@ modèles de la piste A.
 |---|---|---|---|
 | ref_rte_j (prévision RTE du jour) | 1,05 | 0,68 | −0,95 |
 | ref_rte_j1 (prévision RTE de la veille) | 1,21 | 0,93 | −0,92 |
+| **Piste B** lightgbm_niveau_corr | 1,21 | 1,21 | +0,12 |
+| **Fondation** ts_timestral_209m_meteo | 1,30 | 1,30 | −0,08 |
 | **Piste B** lightgbm_niveau | 1,42 | 1,27 | +0,90 |
-| **Piste B** ridge_niveau | 2,02 | 1,82 | +1,01 |
+| **Fondation** ts_timestral_28m_meteo | 1,72 | 1,71 | −0,15 |
 | **Piste A** lightgbm_corr | 1,71 | 1,71 | +0,11 |
 | **Piste A** lightgbm_recent_corr | 1,75 | 1,75 | +0,11 |
+| **Piste B** ridge_niveau_corr | 1,79 | 1,79 | +0,11 |
+| **Piste A** mlp_corr (4 graines) | 1,90 | 1,90 | +0,11 |
+| **Piste A** mlp_recent_corr (4 graines) | 1,92 | 1,92 | +0,09 |
+| **Piste B** ridge_niveau | 2,02 | 1,82 | +1,01 |
+| **Fondation** ts_timestral_209m | 2,20 | 2,20 | −0,08 |
+| **Fondation** ts_timestral_28m | 2,31 | 2,30 | −0,11 |
 | **Série temporelle** ts_holt_winters | 2,39 | 2,39 | −0,03 |
 | ref_naive_j1 | 2,57 | 2,57 | −0,01 |
 | **Piste A** lightgbm_recent | 2,65 | 1,92 | +2,24 |
 | **Piste A** lightgbm | 2,91 | 1,92 | +2,60 |
 | **Piste A** ridge_corr | 2,98 | 2,98 | +0,12 |
+| **Piste A** mlp (4 graines) | 3,11 | 2,04 | +2,76 |
+| **Piste A** mlp_recent (4 graines) | 2,85 | 2,10 | +2,28 |
 | **Piste A** ridge_recent | 3,49 | 3,05 | +2,07 |
 | **Piste A** ridge | 3,78 | 3,10 | +2,57 |
 | ref_naive_j2 | 4,18 | 4,18 | −0,02 |
@@ -160,7 +172,7 @@ Ce que cela dit, et ce que cela ne dit pas :
    un biais résiduel (+0,90 GW) : le modèle voit le niveau, mais apprend sa relation à la consommation sur des
    années où le niveau était différent. **Les deux approches se combinent** : avec la correction du biais en plus, LightGBM
    tombe à **1,21 GW** (biais +0,12 GW, MASE 0,47, ± 0,08 GW entre graines), au niveau de la prévision RTE de la veille
-   (1,21 GW), et le Ridge à 1,79 GW. Premier essai isolé, régénéré dans les résultats officiels par le lancement complet.
+   (1,21 GW), et le Ridge à 1,79 GW. Confirmé par le lancement complet.
 4. **Les prévisions d'RTE restent meilleures** (1,05 à 1,21 GW) : elles disposent d'informations qu'on n'a
    pas. Elles sont un plafond de comparaison, pas un concurrent.
 5. **Le Ridge est derrière LightGBM dans toutes les conditions**, y compris avec le niveau récent : la relation
@@ -169,9 +181,15 @@ Ce que cela dit, et ce que cela ne dit pas :
    et que LightGBM brut (2,91 GW), car il suit le niveau. Mais il reste derrière LightGBM corrigé (1,71 GW) et
    LightGBM avec niveau récent (1,42 GW) : la météo apporte environ 1 GW de plus. Cet écart n'est valable
    que pour ce protocole et ce modèle de série temporelle ; un SARIMAX ou un réseau de séquence pourraient faire mieux.
-7. **Non mesuré** : le MLP PyTorch sur ce protocole complet (son lancement complet est prévu à part). Dans
-   `RESULTS.md`, le « ± » du classement global est l'écart entre années de test ; l'écart entre graines (LightGBM)
-   est dans le détail par année. Le Ridge, déterministe, n'en a pas.
+7. **Le MLP a le même défaut que LightGBM** : sa MAE centrée (2,04 GW) est proche de celle de LightGBM
+   (1,92 GW), donc l'écart de niveau domine aussi son erreur ; la correction du biais le ramène à 1,90 GW. Il est
+   instable d'une graine à l'autre (± 0,4 à 0,7 GW en 2023 et 2024, contre ± 0,01 pour LightGBM) : un seul
+   entraînement ne serait pas fiable. Ses années récentes pondérées (`mlp_recent`) ne changent pas le diagnostic.
+8. **Timestral 209 M avec météo (1,30 GW), sans entraînement,** bat tous les modèles de la piste A corrigés
+   et reste au niveau de la prévision RTE de la veille, avec la réserve de la météo « parfaite » (section 3.4).
+   Sans météo, il fait 2,20 GW, un peu mieux que le lissage exponentiel (2,39 GW).
+9. Dans `RESULTS.md`, le « ± » du classement global est l'écart entre années de test ; l'écart entre graines
+   (LightGBM, MLP) est dans le détail par année. Le Ridge, déterministe, n'en a pas.
 
 ## 6. Choix transverses
 
@@ -189,8 +207,7 @@ Ce que cela dit, et ce que cela ne dit pas :
 
 ## 7. Ce qui reste à faire
 
-- Lancement complet du MLP et des variantes avec 5 graines.
-- Combiner niveau récent et correction du biais, et mesurer ce que la combinaison apporte.
+- MLP avec le niveau récent (`mlp_niveau`) : seule famille sans variante de piste B (section 3.5 quand mesuré).
 - Autres séries temporelles et modèles de séquence (SARIMAX, GRU, CNN 1D, TCN) puis modèles de fondation (Chronos, TimesFM).
 - Surveiller le biais glissant en production et réentraîner au-delà d'un seuil (non commencé).
 - Déploiement d'une démo (section 10 du CDC).

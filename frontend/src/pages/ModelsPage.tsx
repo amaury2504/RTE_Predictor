@@ -45,7 +45,7 @@ const MODELS: ModelInfo[] = [
         lines: [
             "Pré-entraîné sur de très nombreuses séries, sans entraînement ici.",
             "Basé sur un Transformer : son attention relie les moments passés qui ressemblent au présent.",
-            "Il complète directement les heures à venir, avec la météo en appui.",
+            "Il complète directement les heures à venir, à partir de la seule consommation passée.",
         ],
     },
     {

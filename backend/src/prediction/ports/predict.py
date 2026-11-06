@@ -1,4 +1,4 @@
-from src.prediction.domain.models_prediction import  ModelMetrics, PredictionResult, PredictionInput
+from src.prediction.domain.models_prediction import PredictionInput, ModelMetrics, PredictionResult
 from abc import ABC,abstractmethod
 
 
@@ -7,6 +7,10 @@ class PredictionModelPort(ABC):
     @abstractmethod
     def predict_item(self,features:PredictionInput)->PredictionResult:
         pass
+
+    def predict_items(self,inputs:list[PredictionInput])->list[PredictionResult]:
+        """Prédit un lot. Par défaut, une prédiction après l'autre ; un modèle peut regrouper le calcul."""
+        return [self.predict_item(i) for i in inputs]
 
 
 

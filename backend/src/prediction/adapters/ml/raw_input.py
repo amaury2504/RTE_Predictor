@@ -29,3 +29,9 @@ def raw_row_from_input(input: PredictionInput) -> dict:
     for region, humidity in input.humidity_regions.items():
         raw[f"humidity_{region}"] = humidity
     return raw
+
+
+def utc_timestamp(input: PredictionInput) -> pd.Timestamp:
+    """Heure UTC (sans fuseau, à l'heure pleine) de la prédiction demandée."""
+    raw = raw_row_from_input(input)
+    return pd.to_datetime(raw["date"], format="%d/%m/%Y") + pd.Timedelta(hours=raw["hour"])

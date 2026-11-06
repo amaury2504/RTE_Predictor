@@ -22,6 +22,24 @@ class PredictConsumptionUseCase():
         resultat=self.methode.predict_item(self.input)
         return(resultat)
     
+class PredictBatchUseCase():
+    """Orchestre la prédiction d'un lot d'entrées avec la méthode choisie (un seul calcul groupé si le modèle le permet).
+
+    Args :
+    - inputs : list[PredictionInput]
+
+    Returns :
+    - list[PredictionResult], dans le même ordre
+    """
+
+    def __init__(self,inputs:list[PredictionInput],method:PredictionModelPort):
+        self.inputs=inputs
+        self.methode=method
+
+    def execute(self)->list[PredictionResult]:
+        return self.methode.predict_items(self.inputs)
+
+
 class EvaluateModelPerformanceUseCase():
     """Classe qui permet d'évaluer le modèle que l'on utilise. 
     

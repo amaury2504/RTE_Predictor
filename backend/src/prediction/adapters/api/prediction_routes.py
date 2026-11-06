@@ -5,9 +5,14 @@ from pydantic import BaseModel, Field
 from src.prediction.adapters.ml.PyTorchPrediction import ConsumptionModel
 from src.auth.adapters.api.auth_routes import checker
 from src.prediction.domain.models_prediction import PredictionInput, PredictionResult
-from src.prediction.application.use_cases_prediction import PredictConsumptionUseCase, ComputeKpisUseCase
+from src.prediction.application.use_cases_prediction import PredictBatchUseCase, ComputeKpisUseCase
 from src.prediction.adapters.ml.PyTorchPrediction import PredictWithPytorch
-from src.prediction.adapters.ml.lightgbm_prediction import PredictWithLightGBM
+from src.prediction.adapters.ml.regressor_prediction import PredictWithRegressor
+from src.prediction.adapters.ml.series_prediction import PredictWithHoltWinters, PredictWithTimestral, ForecastUnavailable
+from src.prediction.adapters.ml.timestral_loader import load_timestral, INSTALL_HINT
+from src.prediction.adapters.datasets.rte_history import RteConsumptionHistory
+from src.prediction.ports.consumption_history import ConsumptionHistoryUnavailable
+import threading
 from src.prediction.ports.predict import PredictionModelPort
 from src.prediction.adapters.datasets.benchmark_results import load_benchmark_results
 from datetime import datetime, timezone, timedelta
@@ -25,7 +30,7 @@ PARIS_TZ = ZoneInfo("Europe/Paris")
 
 
 # Modèles servis par l'API (l'identifiant est le même que dans l'onglet « Prédire » du frontend)
-ModelId = Literal["mlp", "lightgbm"]
+ModelId = Literal["mlp", "lightgbm", "ridge", "timestral", "holt-winters"]
 
 
 class PredictionRequest(BaseModel):
@@ -116,20 +121,52 @@ scaler_X = joblib.load("data/scaler_X.pkl")
 scaler_Y = joblib.load("data/scaler_Y.pkl")
 
 
-_lightgbm = None
+_loaded: dict = {}        # modèles chargés à la demande (fichier ou poids), gardés en mémoire
+_load_lock = threading.Lock()
+_history = RteConsumptionHistory()
+
+
+def _load_once(key: str, loader):
+    with _load_lock:
+        if key not in _loaded:
+            _loaded[key] = loader()
+        return _loaded[key]
+
+
+def _load_regressor(model_id: str):
+    try:
+        return _load_once(model_id, lambda: joblib.load(f"data/{model_id}.pkl"))
+    except FileNotFoundError:
+        raise HTTPException(status_code=503, detail=f"Modèle {model_id} indisponible : lancer scripts/train_regressor.py {model_id}")
+
+
+def _load_timestral():
+    try:
+        return _load_once("timestral", load_timestral)
+    except ImportError:
+        raise HTTPException(status_code=503, detail=f"Timestral indisponible : {INSTALL_HINT}")
 
 
 def get_method(model_id: str) -> PredictionModelPort:
-    """Méthode de prédiction du modèle demandé. Le LightGBM est chargé au premier appel (fichier data/lightgbm.pkl)."""
-    global _lightgbm
-    if model_id == "lightgbm":
-        if _lightgbm is None:
-            try:
-                _lightgbm = joblib.load("data/lightgbm.pkl")
-            except FileNotFoundError:
-                raise HTTPException(status_code=503, detail="Modèle LightGBM indisponible : lancer scripts/train_lightgbm.py")
-        return PredictWithLightGBM(_lightgbm)
+    """Méthode de prédiction du modèle demandé. Sauf le MLP, les modèles sont chargés au premier appel."""
+    if model_id in ("lightgbm", "ridge"):
+        return PredictWithRegressor(_load_regressor(model_id))
+    if model_id == "holt-winters":
+        return PredictWithHoltWinters(_history)
+    if model_id == "timestral":
+        return PredictWithTimestral(_history, _load_timestral)
     return PredictWithPytorch(model, scaler_X, scaler_Y)
+
+
+def run_predictions(model_id: str, inputs: list[PredictionInput]) -> list[PredictionResult]:
+    """Prédit un lot avec le modèle demandé ; les modèles de séries temporelles ont besoin de la consommation passée."""
+    method = get_method(model_id)
+    try:
+        return PredictBatchUseCase(inputs, method).execute()
+    except ConsumptionHistoryUnavailable as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except ForecastUnavailable as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 class RTEConsumptionResponse(BaseModel):
@@ -176,26 +213,17 @@ async def get_rte_now(date: str, hour: int):
 @prediction_router.post("/predict", dependencies=[Depends(checker.authorized_request)], response_model=PredictionResponse)
 def predict_consumption(data: PredictionRequest):
     domain_input = PredictionInput(data.date, data.hour, data.temperatures, data.wind_speeds, data.humidities)
-    method = get_method(data.model)
-    use_case = PredictConsumptionUseCase(domain_input, method)
-    response = use_case.execute_prediction_item()
-    result = PredictionResult(response.date, response.hour, response.power)
+    result = run_predictions(data.model, [domain_input])[0]
     logger.info("Prédiction %s demandée pour le %s à %sh", data.model, data.date, data.hour)
     return PredictionResponse(date=result.date, hour=result.hour, power=result.power)
 
 
 @prediction_router.post("/batch-predict", dependencies=[Depends(checker.authorized_request)], response_model=BatchPredictionResponse)
 def batch_predict(data: BatchPredictionRequest):
-    method = get_method(data.model)
-    results = []
-    for item in data.items:
-        domain_input = PredictionInput(item.date, item.hour, item.temperatures, item.wind_speeds, item.humidities)
-        use_case = PredictConsumptionUseCase(domain_input, method)
-        resp = use_case.execute_prediction_item()
-        result = PredictionResult(resp.date, resp.hour, resp.power)
-        results.append(PredictionResponse(date=result.date, hour=result.hour, power=result.power))
+    inputs = [PredictionInput(i.date, i.hour, i.temperatures, i.wind_speeds, i.humidities) for i in data.items]
+    results = run_predictions(data.model, inputs)
     logger.info("Batch predict (%s) : %d prédictions exécutées", data.model, len(results))
-    return BatchPredictionResponse(items=results)
+    return BatchPredictionResponse(items=[PredictionResponse(date=r.date, hour=r.hour, power=r.power) for r in results])
 
 
 @prediction_router.post("/kpis", dependencies=[Depends(checker.authorized_request)], response_model=KpiResponse)

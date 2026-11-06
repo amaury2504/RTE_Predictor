@@ -15,7 +15,7 @@ export interface PredictModel {
 export const PREDICT_MODELS: PredictModel[] = [
     { id: "mlp", name: "MLP", kind: "Réseau de neurones", served: true },
     { id: "lightgbm", name: "LightGBM", kind: "Arbres de décision en série", served: true, best: true },
-    { id: "timestral", name: "Timestral", kind: "Modèle de fondation", served: false },
-    { id: "ridge", name: "Ridge", kind: "Régression linéaire", served: false },
-    { id: "holt-winters", name: "Holt-Winters", kind: "Lissage exponentiel", served: false },
+    { id: "timestral", name: "Timestral", kind: "Modèle de fondation", served: true },
+    { id: "ridge", name: "Ridge", kind: "Régression linéaire", served: true },
+    { id: "holt-winters", name: "Holt-Winters", kind: "Lissage exponentiel", served: true },
 ]

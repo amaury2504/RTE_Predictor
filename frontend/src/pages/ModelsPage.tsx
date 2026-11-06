@@ -44,7 +44,7 @@ const MODELS: ModelInfo[] = [
         Art: TimestralArt,
         lines: [
             "Pré-entraîné sur de très nombreuses séries, sans entraînement ici.",
-            "Son attention relie les moments passés qui ressemblent au présent.",
+            "Basé sur un Transformer : son attention relie les moments passés qui ressemblent au présent.",
             "Il complète directement les heures à venir, avec la météo en appui.",
         ],
     },

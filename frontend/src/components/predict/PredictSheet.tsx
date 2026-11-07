@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from "react"
+import { lazy, Suspense, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { animate } from "animejs"
 import { predict, fetchCurrentWeather, fetchRTENow } from "../../services/api"
@@ -8,6 +8,8 @@ import GlassButton from "../glass/GlassButton"
 import FranceScan from "../data/FranceScan"
 import FranceStack from "../data/FranceStack"
 import GlassCard from "../glass/GlassCard"
+import SideResult from "./SideResult"
+import type { NowResult, ResultVariant } from "./SideResult"
 import { duration, easeOut, SCAN_SWEEP_MS } from "../../design/motion"
 import { useAnimeScope } from "../../hooks/useAnimeScope"
 import { useReducedMotion } from "../../hooks/useReducedMotion"
@@ -15,6 +17,8 @@ import { signed } from "../../lib/format"
 import type { PredictModel } from "../../lib/predictModels"
 import { REGIONS } from "../../types/api"
 import type { PredictionResponse } from "../../types/api"
+
+const RESULT_FADE_MS = 1500 // apparition de la case résultat (variante A)
 
 // L'analyse sur 7 jours embarque Recharts : chargée seulement quand on clique sur le bouton
 const WeekAnalysis = lazy(() => import("./WeekAnalysis"))
@@ -46,7 +50,7 @@ function Figure({ label, value, color }: { label: string; value: number; color: 
  * Prédiction en temps réel : un seul geste. La météo actuelle est récupérée, le modèle prédit la consommation
  * de l'heure en cours, et on la compare à la consommation réelle publiée par RTE.
  */
-export default function PredictSheet({ model }: { model: PredictModel }) {
+export default function PredictSheet({ model, variant, active }: { model: PredictModel; variant: ResultVariant; active: boolean }) {
     const [result, setResult] = useState<PredictionResponse | null>(null)
     const [rteConsumptionMW, setRteConsumptionMW] = useState<number | null>(null)
     const [loading, setLoading] = useState(false)
@@ -68,18 +72,24 @@ export default function PredictSheet({ model }: { model: PredictModel }) {
     // Un modèle pas encore servi par le backend : la feuille est visible, mais les actions sont inactives
     const unavailable = !model.served
 
-    // Le résultat apparaît en fondu, avec un léger glissement
+    // Variante A : la case résultat apparaît lentement (fondu et glissement), puis la page défile jusqu'à elle si elle
+    // est hors de l'écran : sans cela, le résultat s'affichait sous la carte sans que l'on voie qu'il était arrivé.
     useAnimeScope(resultRef, () => {
-        animate(resultRef.current!, {
+        const el = resultRef.current
+        if (!el) return
+        animate(el, {
             opacity: [0, 1],
-            translateY: reduce ? 0 : [12, 0],
-            duration: reduce ? duration.fast : duration.slow,
-            ease: easeOut,
+            translateY: reduce ? 0 : [28, 0],
+            duration: reduce ? duration.fast : RESULT_FADE_MS,
+            ease: "inOutQuad",
         })
-    }, [result, reduce])
+        el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" })
+    }, [result, reduce, variant])
 
     const handleWeek = () => {
         setError(null)
+        // Variante B : un nouveau flux fait disparaître les chiffres affichés autour de la carte
+        if (variant === "b") { setResult(null); setRteConsumptionMW(null) }
         setWeekBusy(true)
         setWeekRun(n => n + 1)
         // Mouvement réduit : pas de scène en 3D, la carte simple indique seulement que l'analyse est en cours
@@ -145,18 +155,38 @@ export default function PredictSheet({ model }: { model: PredictModel }) {
     const gapPct = predictedGW != null && actualGW != null && actualGW !== 0 ? ((predictedGW - actualGW) / actualGW) * 100 : null
     const busy = loading || weekBusy || stackOn || unavailable
 
+    // Variante B : changer d'onglet (autre modèle) efface aussi les chiffres autour de la carte
+    if (variant === "b" && !active && result) { setResult(null); setRteConsumptionMW(null) }
+
+    // Mémorisé : la colonne de résultat compare cet objet d'un rendu à l'autre
+    const sideData = useMemo<NowResult | null>(
+        () => result && predictedGW != null
+            ? { predictedGW, actualGW, gapPct, date: result.date, hour: result.hour }
+            : null,
+        [result, predictedGW, actualGW, gapPct],
+    )
+
+    const map = stackOn ? (
+        <FranceStack
+            active={weekBusy}
+            startLit={result != null || weekDone}
+            onExited={() => { setStackOn(false); setWeekDone(true) }}
+        />
+    ) : (
+        <FranceScan state={scanning || (reduce && weekBusy) ? "scanning" : result || weekDone ? "done" : "idle"} />
+    )
+
     return (
         <div className="space-y-6">
             <GlassCard className="overflow-hidden px-4 py-4">
-                {stackOn ? (
-                    <FranceStack
-                        active={weekBusy}
-                        startLit={result != null || weekDone}
-                        onExited={() => { setStackOn(false); setWeekDone(true) }}
-                    />
-                ) : (
-                    <FranceScan state={scanning || (reduce && weekBusy) ? "scanning" : result || weekDone ? "done" : "idle"} />
-                )}
+                {variant === "b" ? (
+                    // Variante B : la prédiction (gauche) et la consommation réelle (droite) entourent la carte
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)_minmax(0,1fr)] lg:items-center">
+                        <div className="col-span-2 lg:col-span-1 lg:col-start-2 lg:row-start-1">{map}</div>
+                        <SideResult side="left" data={sideData} className="lg:col-start-1 lg:row-start-1" />
+                        <SideResult side="right" data={sideData} className="lg:col-start-3 lg:row-start-1" />
+                    </div>
+                ) : map}
             </GlassCard>
 
             {unavailable && (
@@ -199,7 +229,7 @@ export default function PredictSheet({ model }: { model: PredictModel }) {
             )}
 
             {/* Résultat de « Prédire maintenant » : sous les deux cases, sur toute la largeur */}
-            {result && predictedGW != null && (
+            {variant === "a" && result && predictedGW != null && (
                 <div ref={resultRef} style={{ opacity: 0 }}>
                     <GlassCard className="px-8 py-7">
                         <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6">

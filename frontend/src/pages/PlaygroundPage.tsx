@@ -43,7 +43,7 @@ export default function PlaygroundPage() {
                 <header className="flex items-center gap-3">
                     <LogoMark />
                     <div>
-                        <p className="text-xs font-medium uppercase tracking-widest text-[var(--accent-soft)]">RTE Predictor · playground</p>
+                        <p className="text-xs font-medium uppercase tracking-widest text-[var(--accent-soft)]">ML Predictor · playground</p>
                         <h1 className="bg-gradient-to-b from-white to-white/60 bg-clip-text text-3xl font-semibold text-transparent">
                             Fondations du design
                         </h1>

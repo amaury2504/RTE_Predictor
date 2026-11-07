@@ -64,7 +64,7 @@ export default function LoginPage() {
             <div className="w-full max-w-md">
                 <div className="mb-8 flex flex-col items-center text-center">
                     <LogoMark size={44} />
-                    <h1 className="mt-4 text-2xl font-semibold tracking-tight text-ink">RTE Predictor</h1>
+                    <h1 className="mt-4 text-2xl font-semibold tracking-tight text-ink">ML Predictor</h1>
                     <p className="mt-1 text-sm text-muted">Prédiction de consommation électrique</p>
                 </div>
 

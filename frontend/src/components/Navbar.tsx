@@ -31,7 +31,7 @@ export default function Navbar({ onBack, right, maxWidth = "4xl" }: NavbarProps)
                     )}
                     <div className="flex items-center gap-2.5">
                         <LogoMark />
-                        <span className="font-semibold tracking-tight text-ink">RTE Predictor</span>
+                        <span className="font-semibold tracking-tight text-ink">ML Predictor</span>
                     </div>
                 </div>
                 <div className="text-sm text-muted">{right}</div>

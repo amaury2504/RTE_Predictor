@@ -217,4 +217,34 @@ Ce que cela dit, et ce que cela ne dit pas :
 
 - Autres séries temporelles et modèles de séquence (SARIMAX, GRU, CNN 1D, TCN) puis modèles de fondation (Chronos, TimesFM).
 - Surveiller le biais glissant en production et réentraîner au-delà d'un seuil (non commencé).
+- Réentraîner chaque mois les modèles servis avec les données récentes (le jeu de données s'arrête en 2024).
 - Déploiement d'une démo (section 10 du CDC).
+
+## 8. Modèles servis par l'API (commit 8c18b3d)
+
+Jusqu'ici l'API servait LightGBM, Ridge et MLP entraînés sur la météo et le calendrier seuls : ils prédisaient presque
+toujours trop haut (3 à 4 GW d'erreur), pour la raison du diagnostic de la section 2. Les trois modèles servis sont
+désormais les versions « niveau récent » de la piste B (`lightgbm_niveau.pkl`, `ridge_niveau.pkl`, `mlp_niveau.pkl`).
+
+- **Variables ajoutées** : consommation à la même heure 2 et 7 jours avant, moyennes sur 7 et 28 jours. Elles sont
+  connues jusqu'à 48 h avant l'heure prévue, comme dans le benchmark.
+- **Découpage** : entraînement jusqu'en 2022, validation 2023, test 2024 (comme la dernière année du benchmark).
+
+| Modèle | Avant (test 2024) | Après (test 2024) | Après (21 derniers jours réels) |
+|---|---|---|---|
+| LightGBM | 3,25 GW | 1,44 GW | 1,68 GW |
+| Ridge | 3,96 GW | 1,87 GW | 1,65 GW |
+| MLP | 2,91 GW | 1,86 GW | 1,72 GW |
+
+- **Mesure sur 21 jours** : vraie météo passée et vraie consommation RTE. MAPE d'environ 3,3 à 3,6 %, biais proche de 0
+  pour LightGBM et Ridge. C'est une estimation sur un échantillon court, pas une garantie.
+- **Correction du biais pour le MLP seulement** : il garde +0,9 GW de biais avec le niveau récent seul. La correction
+  du biais récent (météo passée d'Open-Meteo, mise en cache 1 h) le ramène de 1,83 à 1,72 GW. Sur ces 21 jours, elle
+  n'améliorait ni LightGBM (1,68 → 1,77 GW) ni Ridge (inchangé), donc elle ne leur est pas appliquée. Si Open-Meteo
+  est injoignable ou refuse (429), la prédiction est rendue sans correction, sans erreur.
+- **Limite d'heure** : ces modèles ne prévoient qu'au plus 48 h après la dernière consommation publiée. Au-delà, l'API
+  renvoie une erreur 422 avec un message explicite.
+- **Vérifié le 7 novembre 2026** : les 327 tests passent ; les cinq modèles répondent pour l'heure en cours ; LightGBM,
+  Ridge et MLP répondent pour les 168 dernières heures (lot de 168) et refusent (422) une heure à plus de 48 h.
+- **Réentraînement** : le jeu de données s'arrête en 2024. Un réentraînement mensuel avec les données récentes est
+  l'étape suivante (voir section 7).

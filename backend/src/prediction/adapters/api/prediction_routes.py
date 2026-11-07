@@ -7,10 +7,11 @@ from src.auth.adapters.api.auth_routes import checker
 from src.prediction.domain.models_prediction import PredictionInput, PredictionResult
 from src.prediction.application.use_cases_prediction import PredictBatchUseCase, ComputeKpisUseCase
 from src.prediction.adapters.ml.PyTorchPrediction import PredictWithPytorch
-from src.prediction.adapters.ml.regressor_prediction import PredictWithRegressor
+from src.prediction.adapters.ml.regressor_prediction import PredictWithRegressor, LevelUnavailable
 from src.prediction.adapters.ml.series_prediction import PredictWithHoltWinters, PredictWithTimestral, ForecastUnavailable
 from src.prediction.adapters.ml.timestral_loader import load_timestral, INSTALL_HINT
 from src.prediction.adapters.datasets.rte_history import RteConsumptionHistory
+from src.prediction.adapters.datasets.open_meteo_history import OpenMeteoWeatherHistory
 from src.prediction.ports.consumption_history import ConsumptionHistoryUnavailable
 import os
 import threading
@@ -125,6 +126,7 @@ scaler_Y = joblib.load("data/scaler_Y.pkl")
 _loaded: dict = {}        # modèles chargés à la demande (fichier ou poids), gardés en mémoire
 _load_lock = threading.Lock()
 _history = RteConsumptionHistory()
+_weather_history = OpenMeteoWeatherHistory()
 
 
 def _load_once(key: str, loader):
@@ -135,8 +137,9 @@ def _load_once(key: str, loader):
 
 
 def _load_regressor(model_id: str):
+    """Modèle entraîné avec le niveau récent de la consommation (data/<modèle>_niveau.pkl)."""
     try:
-        return _load_once(model_id, lambda: joblib.load(f"data/{model_id}.pkl"))
+        return _load_once(model_id, lambda: joblib.load(f"data/{model_id}_niveau.pkl"))
     except FileNotFoundError:
         raise HTTPException(status_code=503, detail=f"Modèle {model_id} indisponible : lancer scripts/train_regressor.py {model_id}")
 
@@ -165,7 +168,11 @@ def preload_timestral() -> None:
 def get_method(model_id: str) -> PredictionModelPort:
     """Méthode de prédiction du modèle demandé. Sauf le MLP, les modèles sont chargés au premier appel."""
     if model_id in ("lightgbm", "ridge"):
-        return PredictWithRegressor(_load_regressor(model_id))
+        # Niveau récent seul : sur 21 jours réels, la correction du biais n'améliore ni LightGBM (biais déjà ~0) ni Ridge
+        return PredictWithRegressor(_load_regressor(model_id), _history)
+    if model_id == "mlp" and os.path.exists("data/mlp_niveau.pkl"):
+        # Le MLP garde un biais de +0,9 GW avec le niveau récent seul : la correction du biais le ramène à ~0 (1,83 → 1,72 GW)
+        return PredictWithRegressor(_load_regressor("mlp"), _history, _weather_history)
     if model_id == "holt-winters":
         return PredictWithHoltWinters(_history)
     if model_id == "timestral":
@@ -180,7 +187,7 @@ def run_predictions(model_id: str, inputs: list[PredictionInput]) -> list[Predic
         return PredictBatchUseCase(inputs, method).execute()
     except ConsumptionHistoryUnavailable as e:
         raise HTTPException(status_code=502, detail=str(e))
-    except ForecastUnavailable as e:
+    except (ForecastUnavailable, LevelUnavailable) as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 

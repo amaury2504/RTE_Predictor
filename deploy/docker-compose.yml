@@ -16,7 +16,7 @@ services:
       # Charge Timestral au démarrage, en tâche de fond : le premier visiteur n'attend pas les poids
       TIMESTRAL_PRELOAD: "true"
     volumes:
-      # Contient model.pth, scaler_*.pkl, lightgbm.pkl, ridge.pkl (non versionnés), les bases SQLite et le cache des poids Timestral
+      # Contient model.pth, scaler_*.pkl, mlp_niveau.pkl, lightgbm_niveau.pkl, ridge_niveau.pkl (non versionnés), les bases SQLite et le cache des poids Timestral
       - ./data:/app/data
     mem_limit: 1g          # PyTorch consomme de la mémoire : on protège les autres projets du serveur
     networks: [default]

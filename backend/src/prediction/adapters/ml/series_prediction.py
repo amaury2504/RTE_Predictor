@@ -6,6 +6,7 @@ connue jusqu'à 48 h avant (même hypothèse que dans le benchmark). L'historiqu
 import numpy as np
 import pandas as pd
 
+from src.prediction.adapters.ml.history_grid import extend_history
 from src.prediction.adapters.ml.raw_input import utc_timestamp
 from src.prediction.domain.foundation import DELAY_HOURS, foundation_forecasts
 from src.prediction.domain.models_prediction import PredictionInput, PredictionResult
@@ -24,16 +25,6 @@ MIN_CONTEXT_HOURS = 24 * 14
 
 class ForecastUnavailable(Exception):
     """L'historique ne suffit pas pour prévoir l'heure demandée (trop lointaine, ou historique trop court)."""
-
-
-def _extend(history: pd.Series, last: pd.Timestamp) -> tuple[pd.DatetimeIndex, np.ndarray]:
-    """Historique sur une grille horaire complète, prolongée jusqu'à `last` par des heures inconnues (NaN).
-
-    Les heures à prévoir (au-delà de la dernière consommation publiée) doivent TOUTES être sur la grille : les
-    prévisions sont lues à ces horodatages. Les heures manquantes de l'historique deviennent aussi des NaN.
-    """
-    grid = pd.date_range(history.index.min(), max(history.index.max(), last), freq="h")
-    return grid, history.reindex(grid).to_numpy(dtype=float)
 
 
 def _results(inputs: list[PredictionInput], wanted: list[pd.Timestamp], forecast: pd.Series) -> list[PredictionResult]:
@@ -60,7 +51,7 @@ class PredictWithHoltWinters(PredictionModelPort):
     def predict_items(self, inputs: list[PredictionInput]) -> list[PredictionResult]:
         history = self.history.hourly_gw()
         wanted = [utc_timestamp(i) for i in inputs]
-        index, values = _extend(history, max(wanted))
+        index, values = extend_history(history, max(wanted))
         forecast = pd.Series(holt_winters_forecasts(index, values, self.alpha, self.gamma), index=index)
         return _results(inputs, wanted, forecast)
 
@@ -89,7 +80,7 @@ class PredictWithTimestral(PredictionModelPort):
         context_hours = min(TIMESTRAL_CONTEXT_HOURS, available)
         if context_hours < MIN_CONTEXT_HOURS:
             raise ForecastUnavailable("Historique de consommation insuffisant pour Timestral")
-        index, values = _extend(history, max(wanted).normalize() + pd.Timedelta(hours=23))
+        index, values = extend_history(history, max(wanted).normalize() + pd.Timedelta(hours=23))
         forecast = pd.Series(
             foundation_forecasts(self.loader(), index, values, days, context_hours=context_hours), index=index)
         return _results(inputs, wanted, forecast)

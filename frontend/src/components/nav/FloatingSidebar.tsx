@@ -168,7 +168,7 @@ function MobileDock({ guest }: { guest: boolean }) {
                     {item.shortLabel ?? item.label}
                 </NavLink>
             ))}
-            <span className="px-3" aria-label={guest ? "Mode invité" : "Connecté"}>
+            <span className="px-3" role="img" aria-label={guest ? "Mode invité" : "Connecté"}>
                 <Avatar guest={guest} />
             </span>
         </nav>

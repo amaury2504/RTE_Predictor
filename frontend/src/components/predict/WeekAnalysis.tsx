@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { animate } from "animejs"
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts"
 import { fetchWeekWeather, batchPredict, fetchRTEWeek, fetchKpis } from "../../services/api"
 import { useAuth } from "../../context/AuthContext"
+import { duration } from "../../design/motion"
 import { useReducedMotion } from "../../hooks/useReducedMotion"
 import { num, pct } from "../../lib/format"
 import { REGIONS } from "../../types/api"
@@ -102,9 +104,17 @@ function buildGroups(k: KpiReport): { title: string; items: KpiItem[] }[] {
 
 // --- Analyse -----------------------------------------------------------------
 
+const REVEAL_MS = 1500   // apparition des résultats
+const SCROLL_MS = 1400   // descente vers les résultats
+
 interface WeekAnalysisProps {
     /** Modèle qui prédit (identifiant de l'onglet « Prédire »). */
     modelId: string
+    /**
+     * Vrai quand l'animation de la carte est terminée. Tant qu'il est faux, les résultats (même prêts) restent masqués :
+     * on ne les montre qu'une fois la scène refermée, puis on y descend tranquillement.
+     */
+    reveal: boolean
     /** Prévient la page parente quand l'analyse tourne, pour bloquer les boutons (limite de requêtes météo). */
     onBusyChange?: (busy: boolean) => void
 }
@@ -113,7 +123,7 @@ interface WeekAnalysisProps {
  * Comparaison sur 7 jours (168 heures) : météo historique, prédictions du modèle servi, consommation réelle RTE,
  * puis indicateurs d'erreur. L'analyse démarre au montage ; pour la relancer, la page parente remonte le composant.
  */
-export default function WeekAnalysis({ modelId, onBusyChange }: WeekAnalysisProps) {
+export default function WeekAnalysis({ modelId, reveal, onBusyChange }: WeekAnalysisProps) {
     const [step, setStep] = useState("")
     const [status, setStatus] = useState<"loading" | "done" | "error">("loading")
     const [chartData, setChartData] = useState<ChartPoint[]>([])
@@ -208,17 +218,44 @@ export default function WeekAnalysis({ modelId, onBusyChange }: WeekAnalysisProp
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    // On ne défile vers les résultats qu'une fois l'analyse finie : pendant le calcul, l'animation de la carte
-    // (en haut de la page) doit rester visible.
-    useEffect(() => {
-        if (status === "loading") return
-        root.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" })
-    }, [status, reduce])
+    // Les résultats sont prêts ET l'animation est refermée : ils apparaissent lentement (fondu et glissement) pendant que
+    // la page descend vers eux, à vitesse douce. Un geste de l'utilisateur (molette, toucher, clavier) interrompt la descente.
+    const showResults = status === "done" && reveal
+    useLayoutEffect(() => {
+        const el = root.current
+        if (!showResults || !el) return
+        const target = Math.max(0, el.getBoundingClientRect().top + window.scrollY - 24)   // mesuré avant tout décalage
+        el.style.opacity = "0"
+        const fade = animate(el, {
+            opacity: [0, 1],
+            translateY: reduce ? 0 : [28, 0],
+            duration: reduce ? duration.fast : REVEAL_MS,
+            ease: "inOutQuad",
+        })
+        const position = { y: window.scrollY }
+        const scroll = animate(position, {
+            y: target,
+            duration: reduce ? 0 : SCROLL_MS,
+            ease: "inOutQuad",
+            onUpdate: () => window.scrollTo(0, position.y),
+        })
+        const stop = () => scroll.pause()
+        const events = ["wheel", "touchstart", "keydown"] as const
+        events.forEach(e => window.addEventListener(e, stop, { passive: true, once: true }))
+        return () => {
+            fade.pause()
+            scroll.pause()
+            events.forEach(e => window.removeEventListener(e, stop))
+        }
+    }, [showResults, reduce])
 
     const tickIndices = chartData.filter((_, i) => i % 24 === 0).map(d => d.label)
 
+    // Tant que la scène n'est pas refermée, rien ne s'affiche (sauf une erreur, qui ne doit pas attendre)
+    if (!reveal && status !== "error") return null
+
     return (
-        <div ref={root} className="space-y-6 scroll-mt-6">
+        <div ref={root} className="space-y-6">
             <h2 className="text-xl font-semibold text-[var(--text-1)]">Résultats sur 7 jours</h2>
 
             {status === "loading" && (

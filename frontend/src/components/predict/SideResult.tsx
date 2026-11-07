@@ -5,9 +5,6 @@ import { duration } from "../../design/motion"
 import { useReducedMotion } from "../../hooks/useReducedMotion"
 import { signed } from "../../lib/format"
 
-/** Test A/B de l'affichage du résultat : A = case sous la carte (transition lente), B = chiffres autour de la carte. */
-export type ResultVariant = "a" | "b"
-
 /** Ce que les deux colonnes affichent autour de la carte pour une prédiction « maintenant ». */
 export interface NowResult {
     predictedGW: number

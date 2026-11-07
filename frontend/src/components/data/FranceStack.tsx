@@ -286,8 +286,8 @@ export default function FranceStack({ active, startLit, onExited }: FranceStackP
             </div>
 
             {/* Phrases en orange, à droite de la scène : chacune apparaît à son tour et reste jusqu'à la fin de la simulation.
-                Sous 1280 px il n'y a pas la place à droite : elles s'empilent sous la carte (hauteur réservée). */}
-            <div role="status" className="fs-phrases mt-3 min-h-[5.25rem] space-y-1 text-sm font-medium text-[var(--series-predicted)] xl:absolute xl:left-[calc(100%-28px)] xl:top-1/2 xl:mt-0 xl:min-h-0 xl:w-[250px] xl:-translate-y-1/2">
+                Sous 1100 px il n'y a pas la place à droite : elles s'empilent sous la carte (hauteur réservée). */}
+            <div role="status" className="fs-phrases mt-3 min-h-[5.25rem] space-y-1 text-sm font-medium text-[var(--series-predicted)] min-[1100px]:absolute min-[1100px]:left-[calc(100%-28px)] min-[1100px]:top-1/2 min-[1100px]:mt-0 min-[1100px]:min-h-0 min-[1100px]:w-[250px] min-[1100px]:-translate-y-1/2">
                 {PHRASES.map(text => (
                     <p key={text} className="fs-phrase-line" style={{ opacity: 0 }}>{text}</p>
                 ))}

@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 curl g
 WORKDIR /app
 COPY --from=deps /build/requirements-notorch.txt .
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir -r requirements-notorch.txt \
+    && pip install --no-cache-dir -r requirements-notorch.txt httpx \
     && pip install --no-cache-dir "git+https://github.com/mistralai/timestral.git@a534bdbd244d64f3d9d743f46c7bf6fc330ed4ff"
 
 # Code et résultats du benchmark (versionnés). data/ (modèle, normaliseurs, bases SQLite) est monté en volume.
